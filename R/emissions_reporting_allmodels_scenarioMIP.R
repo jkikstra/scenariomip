@@ -15,61 +15,10 @@ here::i_am("vetting_iam.Rproj")
 source(here("R","utils.R"))
 
 # Scenario input file ----------------------------------------------------------
-SCENARIO_INPUT_FILE <- "scenarios_scenariomip_allmodels_20241001.csv"
+# SCENARIO_INPUT_FILE <- "scenarios_scenariomip_allmodels_20241001.csv"
+SCENARIO_INPUT_FILE <- "scenarios_scenariomip_allmodels_2025-01-07.csv"
 
 
-
-
-
-# DOWNLOAD SCENARIO DATA -------------------------------------------------------
-NEW.DOWNLOAD <- F
-
-if (NEW.DOWNLOAD){
-  # Install reticulate package if not already installed
-  if (!require("reticulate")) install.packages("reticulate")
-
-  # Import the reticulate package
-  library(reticulate)
-
-  # Configure reticulate to use the correct Python environment
-  use_python("C:\\Users\\kikstra\\AppData\\Local\\miniconda3\\envs\\pyam")  # Adjust this path to your Python environment if needed
-
-  # # Install Python packages if needed
-  # py_install("pyam-iamc", pip = TRUE)
-
-  # Define the Python code to retrieve the scenario
-  py_run_string("
-import pyam
-import os
-
-# Establish connection to the ixmp4 platform 'ece-internal'
-pyam.iiasa.Connection('ece_internal')
-
-# Retrieve the desired scenarios
-df = pyam.read_iiasa(
-    'ece_internal',
-    model=[#'SSP_LED_v1.0', # not submitted as such
-    'SSP_SSP1_v1.0', 'SSP_SSP2_v1.0', 'SSP_SSP3_v1.0', 'SSP_SSP4_v1.0', 'SSP_SSP5_v1.0'],
-    scenario=[
-    #'baseline', 'baseline_1000f', # not submitted
-    'SSP1 - Low Emissions', 'SSP1 - Very Low Emissions',
-    'SSP2 - Low Overshoot', 'SSP2 - Medium Emissions', 'SSP2 - Medium-Low Emissions',  'SSP2 - Low Emissions',  'SSP2 - Very Low Emissions',
-    'SSP3 - High Emissions',
-    'SSP4 - Low Overshoot',
-    'SSP5 - High Emissions',
-    #'SSP5 - Low Overshoot' # not submitted
-    ]
-)
-
-# Write out the scenario data
-output_file = 'scenarios_message.csv'
-df.to_csv(
-    os.path.join('data',output_file)
-)
-print(f'Data has been written to {output_file}')
-
-")
-}
 
 # CONFIG -----------------------------------------------------------------------
 STARTYEAR <- 2025

@@ -1072,6 +1072,52 @@ iamc_variable_keep_two_levels <- function(df, levels){
 }
 
 
+# Load necessary libraries
+library(dplyr)
+library(stringr)
+
+# Function: Remove a specific first-level match from the variable column
+# @param df A data frame containing a column named `variable`.
+# @param match.string A string to be matched and removed if it appears at the start of the `variable` column, followed by "|".
+# @return A modified data frame with the specified first-level match removed from the `variable` column.
+remove_variable_firstlevel_match <- function(df, match.string) {
+  # Input validation
+  if (!"variable" %in% colnames(df)) {
+    stop("The data frame must contain a column named 'variable'.")
+  }
+  if (!is.character(match.string) || length(match.string) != 1) {
+    stop("`match.string` must be a single character string.")
+  }
+
+  # Replace the matching pattern at the start of the string
+  df %>%
+    mutate(
+      variable = str_replace(variable, paste0("^", match.string, "\\|"), "")
+    )
+}
+
+# Function: Remove a specific last-level match from the variable column
+# @param df A data frame containing a column named `variable`.
+# @param match.string A string to be matched and removed if it appears at the end of the `variable` column, preceded by "|".
+# @return A modified data frame with the specified last-level match removed from the `variable` column.
+remove_variable_lastlevel_match <- function(df, match.string) {
+  # Input validation
+  if (!"variable" %in% colnames(df)) {
+    stop("The data frame must contain a column named 'variable'.")
+  }
+  if (!is.character(match.string) || length(match.string) != 1) {
+    stop("`match.string` must be a single character string.")
+  }
+
+  # Replace the matching pattern at the end of the string
+  df %>%
+    mutate(
+      variable = str_replace(variable, paste0("\\|", match.string, "$"), "")
+    )
+}
+
+
+
 # Code development utils -------------------------------------------------------
 
 ### Testing utils ----------------------------------------------------------------

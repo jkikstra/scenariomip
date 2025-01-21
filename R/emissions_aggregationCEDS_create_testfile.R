@@ -154,7 +154,7 @@ scenarios_out <- scenarios %>% filter(
   mutate_cond(sector=="Waste", sector="Waste") %>%
   # remove helper columns
   mutate(variable = paste0("CMIP7 Harmonization|Input|", species, "|", sector)) %>%
-  select(-species,sector) %>%
+  select(-species,-sector) %>%
   # add adjusted variables
   bind_rows(scenarios_raw_industrial_summed_iamc) %>%
   bind_rows(scenarios_raw_aircraft_summed_iamc) %>%
