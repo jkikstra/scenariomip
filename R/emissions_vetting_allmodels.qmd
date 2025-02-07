@@ -1,0 +1,1584 @@
+---
+title: "Emissions Vetting (all models)"
+author: "Jarmo S. Kikstra"
+format: html
+editor: visual
+---
+
+```{r}
+library("here")
+library("tidyverse")
+library("vroom")
+library("readxl")
+library("patchwork")
+library("ggthemes")
+library("ggsci")
+library("testthat")
+# library("geomtextpath")
+library("stringr")
+library("ggthemes")
+
+here::i_am("vetting_iam.Rproj")
+
+source(here("R","utils.R"))
+
+
+#' TODO:
+#' - [ ] ...
+
+
+```
+
+## Loading data
+
+```{r}
+IAM_SCENARIOS_LOCATION <- here("data", "data_vetting", "scens")
+IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-01-20.csv"
+
+HISTORY.COUNTRY.AND.GLOBAL <- "cmip7_history_0002.csv"
+HISTORY.IAMREGIONS <- "iamc_regions_cmip7_history_0002.csv"
+HISTORY.COMPOSITE.GLOBAL.INCL.FGASES <- "cmip7_history_world_0011.csv"
+
+```
+
+### Scenario data
+
+#### Load scenario data
+
+```{r}
+
+scenarios <- load_csv_iamc(file.path(IAM_SCENARIOS_LOCATION, IAM_SCENARIOS_FILE), mode="fast")
+# only keep emissions data
+scenarios <- scenarios %>%
+  filter(str_starts(Variable, "Emissions"))
+# to long format
+scenarios <- scenarios %>%
+  iamc_wide_to_long(upper.to.lower = T) %>% 
+  filter(year<=2100)
+
+model.list <- scenarios %>% pull(model) %>% unique()
+model.list.simple <- scenarios %>% distinct(model) %>% simplify_model_names() %>% pull(model) %>% unique()
+
+```
+
+#### Aggregate scenario data to emissions harmonization sectors
+
+```{r}
+# helper column
+add_sector_and_species_columns <- function(df){
+  df %>% 
+  mutate(sector = str_replace(variable, "^Emissions\\|", "")) %>%
+  mutate(species = str_extract(sector, "^[^|]+")) %>%
+  mutate(sector = ifelse(
+    species==sector,
+    "Total",
+    str_replace(sector, paste0("^",species,"\\|"), "")
+  )) %>% 
+    return()
+  
+}
+
+
+# create helper columns (sector, species)
+scenarios_harmonization <- scenarios %>%
+  
+  # # test smaller scenario set for debugging
+  # filter_model_includes("GAINS") %>% 
+  # # filter_includes("Transportation") %>% filter_region_includes("Sub-S") %>% 
+  # filter_scenario_includes("SSP1 - Very Low Emissions") %>% 
+  
+  add_sector_and_species_columns()
+
+
+
+# Industrial sector: create aggregate sector
+industrial_sector_data <- scenarios_harmonization %>%
+  filter(
+    sector %in% c(
+      "Energy|Demand|Industry",
+      "Energy|Demand|Other Sector",
+      "Industrial Processes",
+      "Other"
+    )
+  )
+industrial_sector_data <- industrial_sector_data %>%
+  reframe(
+    value = sum(value, na.rm = T),
+    .by = c("model", "scenario", "region", "unit", "year", "species")
+  ) %>%
+  mutate(sector = "Industrial Sector")
+
+industrial_sector_data <- industrial_sector_data %>%
+  mutate(variable = paste0("Emissions|", species,"|",sector)) %>%
+  select(model,scenario,region,variable,unit, year, value)
+
+# Aircraft: create aggregate (intl + domestic) sector
+aircraft_sector_data <- scenarios_harmonization %>%
+  filter(
+    sector %in% c(
+      "Energy|Demand|Bunkers|International Aviation",
+      "Energy|Demand|Transportation|Domestic Aviation"
+    )
+  )
+aircraft_sector_data <- aircraft_sector_data %>%
+  # sum aircraft sectors
+  reframe(
+    value = sum(value, na.rm = T),
+    .by = c("model", "scenario", "region", "unit", "year", "species")
+  ) %>%
+  mutate(sector = "Aircraft")
+
+aircraft_sector_data <- aircraft_sector_data %>%
+  mutate(variable = paste0("Emissions|", species,"|",sector)) %>%
+  select(model,scenario,region,variable,unit,year,value) %>%
+  filter(
+    # only keep World for Aircraft
+    region=="World"
+  )
+
+# Transportation: subtract domestic aviation 
+transport_sector_data <- scenarios_harmonization %>%
+  filter(
+    sector %in% c(
+      "Energy|Demand|Transportation",
+      "Energy|Demand|Transportation|Domestic Aviation"
+    )
+  )
+transport_sector_data <- transport_sector_data %>%
+  select(-variable) %>%
+  pivot_wider(names_from = sector, values_from = value) %>% 
+  # set so zero if not in data
+  mutate(`Energy|Demand|Transportation` = if ("Energy|Demand|Transportation" %in% names(.)) `Energy|Demand|Transportation` else 0) %>%
+  mutate(`Energy|Demand|Transportation|Domestic Aviation` = if ("Energy|Demand|Transportation|Domestic Aviation" %in% names(.)) `Energy|Demand|Transportation|Domestic Aviation` else 0) %>% 
+  # subtract domestic aviation
+  mutate(value = `Energy|Demand|Transportation` - `Energy|Demand|Transportation|Domestic Aviation`) %>% 
+  reframe(
+    value = sum(value, na.rm = T),
+    .by = c("model", "scenario", "region", "unit", "year", "species")
+  ) %>%
+  mutate(sector = "Transportation Sector")
+
+transport_sector_data <- transport_sector_data %>%
+  mutate(variable = paste0("Emissions|", species,"|",sector)) %>%
+  select(model,scenario,region,variable,unit,year,value)
+
+# finalise 
+
+scenarios_harmonization <- scenarios_harmonization %>% filter(
+  # filter
+  sector %in% c(
+    "Total",
+
+    "Energy|Supply",
+    "Energy|Demand|Bunkers|International Shipping",
+    "Energy|Demand|Residential and Commercial and AFOFI",
+    "Product Use",
+    "AFOLU|Agriculture",
+    "AFOLU|Agricultural Waste Burning",
+    "AFOLU|Land|Fires|Forest Burning",
+    "AFOLU|Land|Fires|Grassland Burning",
+    "AFOLU|Land|Fires|Peat Burning",
+    "Waste"
+  )
+) %>%
+  # rename existing 1-on-1 mappings
+  mutate_cond(sector=="Energy|Supply", sector="Energy Sector") %>%
+  mutate_cond(sector=="Energy|Demand|Bunkers|International Shipping", sector="International Shipping") %>%
+  mutate_cond(sector=="Energy|Demand|Residential and Commercial and AFOFI", sector="Residential Commercial Other") %>%
+  mutate_cond(sector=="Product Use", sector="Solvents Production and Application") %>%
+  mutate_cond(sector=="AFOLU|Agriculture", sector="Agriculture") %>%
+  mutate_cond(sector=="AFOLU|Agricultural Waste Burning", sector="Agricultural Waste Burning") %>%
+  mutate_cond(sector=="AFOLU|Land|Fires|Forest Burning", sector="Forest Burning") %>%
+  mutate_cond(sector=="AFOLU|Land|Fires|Grassland Burning", sector="Grassland Burning") %>%
+  mutate_cond(sector=="AFOLU|Land|Fires|Peat Burning", sector="Peat Burning") %>%
+  mutate_cond(sector=="Waste", sector="Waste") %>%
+  # remove helper columns
+  mutate(variable = paste0("Emissions|", species, "|", sector)) %>%
+  select(-species,-sector) %>%
+  # add adjusted variables
+  bind_rows(industrial_sector_data) %>%
+  bind_rows(aircraft_sector_data) %>%
+  bind_rows(transport_sector_data) %>% 
+  # remove Kyoto Gases aggregate, which we do not use for harmonization
+  filter(!grepl(variable, pattern="Kyoto Gases"))
+
+# save for further inspection (in wide format)
+write_delim(x = scenarios_harmonization %>% 
+              filter(year>=2010) %>% # select only years common to all IAMs, for ease of use and because it makes the file a bit smaller 
+              iamc_long_to_wide(),
+            file = file.path(IAM_SCENARIOS_LOCATION, paste0(substr(IAM_SCENARIOS_FILE, start=1, stop = nchar(IAM_SCENARIOS_FILE)-4),"_harmonizationsectors",".csv")),
+            delim = ",")
+  
+```
+
+### Historical data
+
+```{r}
+
+format_historical <- function(df){
+  return(
+    df %>% 
+      filter(
+        year>=1997, year<=2022 # ad-hoc; because in this version GFED doesn't go earlier than 1997, and CEDS doesn't have 2023
+      )
+  )
+}
+format_historical_add_total <- function(df){
+  return(
+    df %>%
+      bind_rows(
+        df %>%
+          mutate(variable_copy = variable) %>% 
+          iamc_variable_keep_two_levels(c(1,2)) %>% # remove the sector level information; sum over sectors
+          mutate(scenario = "Combined historical data sources") %>% # remove source information; sum over historical data sources
+          reframe(
+            value = ifelse(is.na(sum(value)),
+                           0,
+                           sum(value)),
+            .by = c("model", "scenario", "region", "variable", "unit", "year")
+          ) %>%
+          mutate(variable = paste0(variable, "|Total"))
+      )
+  )
+}
+
+# In harmonization sectors
+hist.national <- vroom(here("data", "data_vetting", "hist", HISTORY.COUNTRY.AND.GLOBAL)) %>% 
+  iamc_wide_to_long() %>%
+  format_historical() %>% 
+  format_historical_add_total()
+hist.regional <- vroom(here("data", "data_vetting", "hist", HISTORY.IAMREGIONS)) %>% 
+  iamc_wide_to_long() %>%
+  format_historical() %>% 
+  format_historical_add_total() %>% 
+  filter(
+    !grepl(region, pattern="REMIND 3.1", fixed=T)
+  )
+
+# global level, all species
+hist.global.allspecies <- vroom(here("data", "data_vetting", "hist", HISTORY.COMPOSITE.GLOBAL.INCL.FGASES)) %>% 
+  iamc_wide_to_long() %>% 
+  format_historical()
+
+```
+
+### ScenarioMIP draft paper emissions data used and run with FaIR
+
+##### ScenarioMIP renaming functions
+```{r}
+
+rename_scenariomip_shortletters <- function(df){
+  df %>%
+    
+    # options
+  # 1 high-extension -- High Emissions (H): something that explores high-end range emission pathways, would be good to submit SSP3 and SSP5 based variants; teams may consider even specific high emission variants of these scenarios; as indicated in the document – we expect the scenarios to come out below RCP8.5
+  # 2 high-overshoot -- N/A: extension variant after 2125.
+  # 3 low -- Low Emissions (L): comparable with likely 2C; reaching net zero GHG; SSP1 / SSP2 based
+  # 4 medium-extension -- Medium Emissions (M): following current policies; more or less stable emissions; based on all SSPs, or if one needs to prioritize SSP2
+  # 5 medium-overshoot -- Medium-Low Emissions (ML): emissions are reduced slowly after 2050 based on medium; reaching net-zero around 2100
+  # 6 verylow -- Very Low Emissions (VLLO): lowest possible emission trajectory – trying to stay as close to C1 type scenarios as possible; SSP1/SSP2 based, this pathways should depict futures with sustainable levels of land-based CDR. Please note that the 2030 emission level should be ‘ plausible’
+  # 7 verylow-overshoot -- Low Overshoot (VLHO): transitioning from Low (or slightly above) to Very Low based on high levels of negative emissions (SSP1/SSP2 based), reaching the VL level around 2100 (can be slightly later). The moment of transition from Low is not specified in detail – but could be around 2050
+
+
+    # short letters
+    mutate_cond(scenario=="high-extension",scenario="H") %>%
+    # mutate_cond(scenario=="high-overshoot",scenario="HOS") %>%
+    mutate_cond(scenario=="medium-extension",scenario="M") %>%
+    mutate_cond(scenario=="medium-overshoot",scenario="ML") %>%
+    mutate_cond(scenario=="low",scenario="L") %>%
+    mutate_cond(scenario=="verylow",scenario="VLLO") %>%
+    mutate_cond(scenario=="verylow-overshoot",scenario="VLHO") %>%
+
+    return()
+}
+
+
+
+add_scenariomip_targets_to_IAM_scenarios <- function(df){
+  df %>% mutate(target = NA) %>%
+    mutate_cond(grepl(x=scenario, pattern="High Emissions", fixed=T), target = "H") %>%
+    mutate_cond(grepl(x=scenario, pattern="Medium Emissions", fixed=T), target = "M") %>%
+    mutate_cond(grepl(x=scenario, pattern="Low Emissions", fixed=T), target = "L") %>% # needs to come before ML and VL, to correctly overwrite
+    mutate_cond(grepl(x=scenario, pattern="Medium-Low Emissions", fixed=T), target = "ML") %>%
+    mutate_cond(grepl(x=scenario, pattern="Very Low Emissions", fixed=T), target = "VLLO") %>% # not the case for REMIND
+    mutate_cond(grepl(x=scenario, pattern="Low Overshoot", fixed=T), target = "VLHO") %>% # not the case for REMIND
+    
+    return()
+}
+
+add_ssp_basis_to_IAM_scenarios <- function(df){
+  df %>% mutate(ssp=substr(scenario, start = 1, stop = 4))
+}
+
+```
+
+##### Load data
+
+```{r}
+# only global totals
+emulator_emissions <- vroom(here("data", "data_vetting", "scenariomip-cmip7-emulator-emissions", "emissions_adjusted.csv")) # process into common-definitions-like data format
+emulator_emissions <- emulator_emissions %>% 
+  # create variable name
+  mutate(variable = paste0("Emissions|", specie)) %>% 
+  mutate_cond(variable=="Emissions|CO2 FFI", variable="Emissions|CO2|Energy and Industrial Processes") %>%
+  mutate_cond(variable=="Emissions|CO2 AFOLU", variable="Emissions|CO2|AFOLU") %>% 
+  # add/arrange identifier columns
+  mutate(model = "ScenarioMIP paper", region = "World", unit = NA_character_) %>%
+  rename(scenario=Scenario) %>% 
+  select(-specie) %>% 
+  wide_sort_columns() %>% 
+  # to long format
+  iamc_wide_to_long() %>%
+  # adjust years
+  mutate(year = year - 0.5) %>% 
+  # adjust units
+  mutate_cond(grepl(x=variable, pattern="CO2", fixed = T), value=value*1e3) %>% # Gt in source data, Mt in IAM data
+  mutate_cond(grepl(x=variable, pattern="N2O", fixed = T), value=value*1e3) %>% # Mt in source data, kt in IAM data
+  select(-unit) %>%
+  # change scenario names to short names
+  rename_scenariomip_shortletters()
+
+```
+
+
+### Load AR6-like emissions harmonization data
+
+```{r}
+
+ar6like.infilled.emissions <- load_csv_iamc(file.path(IAM_SCENARIOS_LOCATION, IAM_SCENARIOS_FILE), mode="fast") %>%
+  filter(str_starts(Variable, "AR6 climate diagnostics|Infilled|Emissions")) %>% 
+  iamc_wide_to_long(upper.to.lower = T)
+
+
+```
+
+### Load AR6-like temperature data
+
+```{r}
+
+ar6like.temp50 <- load_csv_iamc(file.path(IAM_SCENARIOS_LOCATION, IAM_SCENARIOS_FILE), mode="fast") %>%
+  filter(Variable=="AR6 climate diagnostics|Surface Temperature (GSAT)|MAGICCv7.5.3|50.0th Percentile") %>% 
+  iamc_wide_to_long(upper.to.lower = T)
+
+```
+
+
+# Assessments of uncertainties and trends (total by species) 
+
+```{r}
+
+# TBD: uncertainties
+
+# TBD: trends
+
+```
+
+# Lists of sectors-species combinations
+
+```{r}
+
+sector.list <- hist.national %>% mutate(variable_copy=variable) %>%  iamc_variable_keep_one_level(-1) %>% distinct(variable_copy,variable) %>% rename(sector=variable) %>% rename(variable=variable_copy)
+
+
+variable.list <- hist.national %>% distinct(variable) 
+
+sector.species.list <- hist.national %>% distinct(variable) %>% 
+  add_sector_and_species_columns() %>% 
+  distinct(sector,species)
+
+
+```
+
+
+# Visualisation choices
+
+```{r}
+
+STARTYEAR <- 2025
+
+plot.model.colors <- c(
+    "AIM" = "#4D5CAD",
+    "COFFEE" = "#69BA7F",
+    "GCAM" = "#759EA8",
+    "IMAGE" = "#868367",
+    "MESSAGE" = "#892F71",
+    "REMIND" = "#facb1e",
+    "WITCH" = "#fb6a4a")
+
+```
+
+
+# ALIGNMENT (HISTORY): Comparing with historical data
+
+Description text.
+
+### Global
+
+More text:
+
+```{r}
+
+# World (all sectors)
+for (m in model.list.simple){
+  p.data.model <- scenarios_harmonization %>%
+      filter(region=="World") %>% mutate(full.model.name = model) %>% 
+      simplify_model_names() %>%
+      filter(grepl(model, pattern=m, fixed=T)) %>% 
+      iamc_region_keep_one_level(-1) %>% 
+      iamc_variable_keep_one_level(-1)
+  
+  p.data.hist <- hist.national %>% filter(region=="World") %>% 
+        iamc_region_keep_one_level(-1) %>% 
+        iamc_variable_keep_one_level(-1)
+  
+  p.emissions.by.model.sector.global <- ggplot(
+    p.data.model,
+    aes(x=year,y=value)
+  ) +
+    facet_wrap(unit~variable, scales="free_y") +
+    geom_line(aes(colour=scenario,
+                  linetype=full.model.name,
+                  group=interaction(full.model.name,scenario,region,variable))) +
+    geom_line(
+      data = p.data.hist,
+      colour = "black"
+    ) +
+    geom_point(
+      data = p.data.hist,
+      colour = "black",
+      aes(shape = model)
+    ) +
+    theme_jsk() +
+    ylab(NULL) + xlab(NULL) +
+    labs(
+      title = m
+    ) + 
+    mark_history()
+
+
+  dir.create(here("data", "data_vetting", "figures", "per-model", m))
+  save_ggplot(
+    p = p.emissions.by.model.sector.global,
+    h = 500,
+    w = 500,
+    f = here("data", "data_vetting", "figures", "per-model", m, paste0("emissions_global") )
+  )
+}
+
+# World (emissions total)
+for (m in model.list.simple){
+  p.data.model <- scenarios_harmonization %>%
+      filter(region=="World") %>% filter_includes("Total") %>% mutate(full.model.name = model) %>% 
+      simplify_model_names() %>%
+      filter(grepl(model, pattern=m, fixed=T)) %>% 
+      iamc_region_keep_one_level(-1) %>% 
+      iamc_variable_keep_one_level(-1)
+  # p.data.hist <- hist.national %>% filter(region=="World") %>% filter_includes("Total") %>% 
+  #       iamc_region_keep_one_level(-1) %>% 
+  #       iamc_variable_keep_one_level(-1)
+  p.data.hist <- hist.global.allspecies %>% mutate(variable="Total") %>% 
+    reframe(
+      value = ifelse(unit == "Mt CO2/yr",
+                     sum(value),
+                     value),
+      .by = c("scenario", "region", "variable", "unit", "year")
+    ) %>% mutate(model="Composite history")
+  p.emissions.by.model.sector.global <- ggplot(
+    p.data.model,
+    aes(x=year,y=value)
+  ) +
+    facet_wrap(unit~variable, scales="free_y") +
+    geom_line(aes(colour=scenario,
+                  linetype=full.model.name,
+                  group=interaction(full.model.name,scenario,region,variable))) +
+    geom_line(
+      data = p.data.hist,
+      colour = "black"
+    ) +
+    geom_point(
+      data = p.data.hist,
+      colour = "black",
+      aes(shape = model)
+    ) +
+    theme_jsk() +
+    ylab(NULL) + xlab(NULL) +
+    labs(
+      title = m
+    ) + 
+    mark_history()
+
+
+  dir.create(here("data", "data_vetting", "figures", "per-model", m))
+  save_ggplot(
+    p = p.emissions.by.model.sector.global,
+    h = 500,
+    w = 500,
+    f = here("data", "data_vetting", "figures", "per-model", m, paste0("emissions_global_totals") )
+  )
+}
+
+```
+
+### Regional (all models)
+
+```{r}
+#| echo: false
+2 * 2
+```
+
+The `echo: false` option disables the printing of code (only output is displayed).
+
+
+### Regional (for each model separately)
+
+```{r}
+
+
+# regional
+for (m in model.list.simple){
+# for (m in c("MESSAGE")){
+for (s in sector.list %>% pull(sector) %>% unique() ){
+  p.data.model <- scenarios_harmonization %>% mutate(full.model.name = model) %>% 
+      simplify_model_names() %>%
+      filter(grepl(model, pattern=m, fixed=T),
+             grepl(region, pattern=m, fixed=T)) %>% 
+      left_join(sector.list) %>% filter(sector==s) %>% 
+      iamc_region_keep_one_level(-1)
+  p.data.hist <- hist.regional %>% filter_region_includes(m) %>% 
+        left_join(sector.list) %>% filter(sector==s) %>% 
+        iamc_region_keep_one_level(-1)
+  
+  if (nrow(p.data.model)+nrow(p.data.hist)>0){
+    # plot only if there is data to plot (e.g. no regional data for international shipping / aircraft)
+    
+    p.emissions.by.model.sector <- ggplot(
+      p.data.model,
+      aes(x=year,y=value)
+    ) +
+      facet_grid(unit~region, scales="free_y") +
+      # IAM data
+      geom_line(aes(colour=scenario,
+                    linetype=full.model.name,
+                    group=interaction(full.model.name,scenario,region,variable))) +
+      # history
+      geom_line(
+        data = p.data.hist,
+        colour = "black"
+      ) +
+      geom_point(
+        data = p.data.hist,
+        colour = "black",
+        aes(shape = model)
+      ) +
+      theme_jsk() +
+      ylab(NULL) + xlab(NULL) +
+      labs(
+        title = m,
+        subtitle = s 
+      )
+  
+  
+    dir.create(here("data", "data_vetting", "figures", "per-model", m))
+    save_ggplot(
+      p = p.emissions.by.model.sector,
+      h = 500,
+      w = 500,
+      f = here("data", "data_vetting", "figures", "per-model", m, paste0("emissions_", s) )
+    )
+  
+  } else {
+    print(paste0("Skipping non-existing regional emissions for ", s))
+  }
+  
+}
+}
+
+
+
+
+
+```
+
+# VARIABLES: Missing sector-species variables (per model, for the "World" region, the 2020 datapoint)
+
+```{r}
+
+present.or.not.template <- expand_grid(
+  model.list,
+  sector.species.list
+) %>% rename(model=model.list)
+
+model.variable.reporting <- scenarios_harmonization %>% 
+  filter(region=="World",year==2020) %>%
+  add_sector_and_species_columns() %>% 
+  distinct(model,sector,species) %>% 
+  mutate(reported ="yes")
+  
+present.or.not <- present.or.not.template %>% 
+  left_join(
+    model.variable.reporting
+  ) %>% 
+  mutate_cond(
+    is.na(reported), 
+    reported = "no"
+  ) %>% pivot_wider(
+    names_from = species,
+    values_from = reported
+  )
+present.or.not
+
+dir.create(here("data", "data_vetting", "figures", "all-models-overview"))
+write_delim(
+  x = present.or.not,
+  file = here("data", "data_vetting", "figures", "all-models-overview", "variable_reporting.csv"),
+  delim = ","
+)
+
+for (m in present.or.not %>% pull(model) %>% unique() ){
+  
+  present.or.not.per.model <- present.or.not %>% filter(
+    model==m
+  ) 
+  
+  m.simple <- present.or.not.per.model %>% simplify_model_names() %>% pull(model) %>% unique()
+  
+  
+  dir.create(here("data", "data_vetting", "figures", "per-model", m.simple))
+  write_delim(
+    x = present.or.not.per.model,
+    file = here("data", "data_vetting", "figures", "per-model", m.simple, paste0("variable_reporting_",m,".csv")),
+    delim = ","
+  )
+}
+
+
+```
+
+# COUNTRIES: Missing countries (per model)
+
+```{r}
+library(countrycode)
+
+
+countries.all.models <- vroom(
+  here("data", "data_vetting", "hist", "iamc_regions_cmip7_history_missing_iso.csv")
+) %>% 
+  mutate(country = countrycode(sourcevar = iso, origin = "iso3c", destination = "country.name"))
+
+countries.all.models
+
+cd.model.list <- c("AIM 3.0", 
+                   "COFFEE 1.5", 
+                   "GCAM 7.1", 
+                   "IMAGE 3.4", 
+                   "MESSAGEix-GLOBIOM 2.1-R12", 
+                   "REMIND-MAgPIE 3.4-4.8", 
+                   # "REMIND 3.1",
+                   "WITCH 6.0")
+names(cd.model.list) <- c("AIM",
+                          "COFFEE",
+                          "GCAM",
+                          "IMAGE",
+                          "MESSAGE",
+                          "REMIND",
+                          "WITCH")
+
+for (m in names(cd.model.list)){
+  
+  df.model.missing.countries <- countries.all.models[, c("iso", "country", cd.model.list[[m]],
+                                                         "R10", "CEDSv2024_07_08", "GFED4.1s")]
+  
+  dir.create(here("data", "data_vetting", "figures", "per-model", m))
+  write_delim(
+    x = df.model.missing.countries,
+    file = here("data", "data_vetting", "figures", "per-model", m, "missing_countries.csv" ),
+    delim = ","
+  )
+  
+}
+
+```
+
+
+# ALIGNMENT (FUTURE): Comparing with ScenarioMIP paper emissions lines
+
+### Create the dataset: left_join targets to each scenario
+```{r}
+# scenarios
+scenarios.global.with.targets <- scenarios %>%
+  filter(region=="World") %>% 
+  filter(variable %in% variable_unique(emulator_emissions)) %>%  
+      simplify_model_names(keep.full.model.name = T) %>% 
+  add_scenariomip_targets_to_IAM_scenarios() %>% 
+  add_ssp_basis_to_IAM_scenarios() %>% 
+  left_join(
+    # targets
+    emulator_emissions %>% rename(target=scenario, target.value=value) %>% select(-model)
+  )
+```
+### Per model
+```{r}
+library("officer")
+ppt <- read_pptx()
+for (m in (scenarios.global.with.targets %>% pull(model) %>% unique()) ){
+
+  # Add a section title slide
+  ppt <- add_slide(ppt, layout = "Title Slide", master = "Office Theme")
+  ppt <- ph_with(ppt, value = paste("Model:", m), location = ph_location_type(type = "ctrTitle"))
+  ppt <- ph_with(ppt, value = c("Scenarios:\n", paste(scenarios.global.with.targets %>%
+                                                        mutate(st = paste0("Target:", target, ". ", scenario)) %>%
+                                      filter(model==m) %>% pull(st) %>% unique() %>% sort(), sep = "/n")
+                                    ), location = ph_location_type(type = "subTitle"))
+
+  for (e in c(
+    "Emissions|CO2|AFOLU",
+    "Emissions|CO2|Energy and Industrial Processes",
+    "Emissions|CH4",
+    "Emissions|Sulfur",
+    
+    "Emissions|BC",
+    "Emissions|OC"
+    # scenarios.global.with.targets %>% pull(variable) %>% unique()
+  )) {
+    if (
+      nrow(
+        scenarios.global.with.targets %>% filter(variable==e,
+                            model==m)
+      ) != 0
+    ){
+
+      p.mini.ali <- ggplot(
+        scenarios.global.with.targets %>% filter(variable==e,
+                            model==m),
+        aes(x=year)
+      ) +
+        facet_wrap(~target, ncol=3) +
+        mark_history() +
+        geom_line(
+          linetype="dashed",
+          aes(y=value,
+              group=interaction(full.model.name,scenario,variable))
+        ) +
+        geom_line(
+          linetype="solid",
+          aes(y=target.value,
+              group=interaction(scenario,variable))
+        ) +
+        theme_void() +
+        theme(panel.background = element_rect(colour = "grey", linewidth = 0.2)) +
+        labs(title = e, subtitle = m)
+      p.mini.ali
+
+
+
+
+      # plot as separate plots
+      save.string <- here("figures", paste0("scenariomip-",m), paste0("alignment_emissions", "_", gsub("\\|", "_", substr(e,nchar("Emissions|")+1,nchar(e)) ) ))
+      # save_ggplot(
+      #   p = p.mini.ali,
+      #   h = 75,
+      #   w = 100,
+      #   f = save.string
+      # )
+
+      # create powerpoint slides
+      # Create a temporary file to save the plot
+      temp_file <- tempfile(fileext = ".png")
+
+      # Save the plot as a PNG file
+      ggsave(temp_file, plot = p.mini.ali, width = 6, height = 5)
+
+      # Add a new slide to the PowerPoint
+      ppt <- add_slide(ppt, layout = "Title and Content", master = "Office Theme")
+
+      # Add the plot image to the slide
+      ppt <- ph_with(ppt, external_img(temp_file), location = ph_location_fullsize())
+
+    }
+  }
+}
+print(ppt, target = here("data", "data_vetting", "figures", "per-model", "compare_with_scenarioMIP_guidance.pptx"))
+
+```
+
+
+### Per target
+```{r}
+
+
+```
+
+
+
+
+# Create some temperature plots
+
+### All scenario targets, all models, all facets
+```{r}
+# library(geomtextpath)
+
+p.data.temps <- ar6like.temp50 %>% add_scenariomip_targets_to_IAM_scenarios() %>% simplify_model_names(keep.full.model.name = T) %>% add_ssp_basis_to_IAM_scenarios() 
+
+p.data.temps.2100 <- p.data.temps %>% filter(year==2100)
+
+p.data.temps.peak <- p.data.temps %>% reframe(
+  value = max(value),
+  .by = c("model", "scenario", "region", "variable", "unit", "target", "full.model.name", "ssp")
+)
+
+p.data.temps$target <- factor(p.data.temps$target, levels=c('VLLO','VLHO','L','ML', 'M', 'H'))
+
+p.temps <- ggplot(
+  p.data.temps,
+  aes(x=year,y=value,colour=target,
+      group=interaction(full.model.name,scenario,region,variable))
+) +
+  facet_grid(model~target, scales = "free") +
+  mark_history() +
+  # geom_texthline(yintercept = 1.5, label="1.5C", linetype="dashed", colour="black",
+  #                hjust=0.05) +
+  geom_hline(yintercept = 1.5, linetype="dashed", colour="black") +
+  geom_line(
+    aes(y=value,
+        colour=target,
+        linetype=ssp,
+        group=interaction(model,scenario,variable)),
+    linewidth=0.5
+  ) +
+  geom_point(
+    data=. %>% filter(year%in%seq(1990,2100,10)),
+    aes(y=value,
+        colour=target,
+        shape=ssp),
+    size=2
+  ) +
+  geom_text(data=p.data.temps.2100,
+                       aes(label=round(value,digits = 1),
+                           colour=target,
+                           x=2110)) +
+  geom_text(data=p.data.temps.peak %>% left_join(p.data.temps.2100 %>% rename(value.2100=value)),
+                       aes(label=paste0("(",round(value,digits = 1),")"),
+                           colour=target,
+                           y=value.2100,
+                           x=2135)) +
+  theme_jsk() +
+  ylab("C above pre-industrial") +
+  coord_cartesian(xlim = c(1995,2140))
+
+save_ggplot(
+  p = p.temps,
+  h = 400,
+  w = 450,
+  f = here("data", "data_vetting", "figures", "per-scenariotarget", "temps")
+)
+
+
+```
+
+### Per scenario
+
+```{r}
+
+
+
+```
+
+### Per model
+
+```{r}
+
+
+
+```
+
+
+
+# Check aggregation: total of IAMs still total of harmonization sector
+
+```{r}
+
+
+
+```
+
+
+# AR6-infilled vs CEDS2024_release
+
+
+### Data: only global data
+```{r}
+
+hist.total.global <- hist.national %>% filter(region=="World") %>% filter_includes("Total") %>% 
+    iamc_region_keep_one_level(-1) %>% 
+    iamc_variable_keep_one_level(-1)
+
+ar6.infilled.total.global <- ar6like.infilled.emissions %>% filter(region=="World") %>% filter_starts_with("AR6 climate diagnostics|Infilled") %>% 
+  remove_variable_firstlevel_match(match.string = "AR6 climate diagnostics\\|Infilled\\|") %>% 
+  mutate_cond(grepl(variable, pattern="Emissions|CO2", fixed=T), variable="Emissions|CO2") %>% 
+  reframe(
+    value = ifelse(grepl(variable, pattern="Emissions|CO2", fixed=T), sum(value),
+                   value),
+    .by = c("model", "scenario", "region", "variable", "unit", "year")
+  )
+
+scenario.submitted.total.global <- ar6like.infilled.emissions %>% filter(region=="World") %>% filter(variable=="Emissions|CO2")
+  
+
+```
+
+### Analysis: plot
+
+##### Timeseries for all models (CO2)
+```{r}
+
+
+# p.trajectory.co2.infilled.ar6 <- ggplot(
+#   ar6.infilled.total.global %>% filter(unit=="Mt CO2/yr") %>% filter(
+#     year<=2050
+#   ),
+#   aes(y = value, x = year, colour = model)
+# ) + 
+#   facet_grid(~unit) +
+#   geom_line(
+#     aes(group=interaction(model,scenario,region,variable,unit))
+#   ) +
+#   
+#   geom_point(data = hist.total.global %>% filter(unit=="Mt CO2/yr"),
+#              aes(shape = "Historical"), colour="black") +
+#   
+#   theme_jsk()
+# 
+# p.trajectory.co2.infilled.ar6
+
+p.trajectory.co2.infilled.ar6 <- ggplot(
+  ar6like.infilled.emissions %>% filter(unit=="Mt CO2/yr", region=="World") %>% 
+    filter_starts_with("AR6 climate diagnostics|Infilled") %>% 
+    remove_variable_firstlevel_match(match.string = "AR6 climate diagnostics\\|Infilled\\|") %>% 
+    filter(
+      year<=2050
+    ),
+  aes(y = value, x = year, colour = model)
+) + 
+  facet_grid(unit~variable) +
+  geom_line(
+    aes(group=interaction(model,scenario,region,variable,unit))
+  ) +
+  
+  geom_point(data = hist.global.allspecies %>% filter(unit=="Mt CO2/yr"),
+             aes(shape = "Historical"), colour="black") +
+  
+  theme_jsk()
+
+p.trajectory.co2.infilled.ar6
+
+```
+
+##### Timeseries for for problematic models (CO2)
+
+```{r}
+
+
+p.trajectory.co2.modelsubmitted.gcam <- ggplot(
+  mapping = aes(y = value, x = year, colour = model)
+) + 
+  facet_grid(~unit) +
+  
+  # model submitted
+  geom_line(
+      data = scenario.submitted.total.global %>% filter(unit=="Mt CO2/yr") %>% filter(
+      year<=2050,
+      grepl(model, pattern="GCAM", fixed=T)
+    ) %>% mutate(model="GCAM (as submitted)"),
+      aes(group=interaction(model,scenario,region,variable,unit))
+    ) +
+  
+  # after infilling
+  geom_line(
+      data = ar6.infilled.total.global %>% filter(unit=="Mt CO2/yr") %>% filter(
+      year<=2050,
+      grepl(model, pattern="GCAM", fixed=T)
+    ) %>% mutate(model="GCAM (after harmonization)"),
+      aes(group=interaction(model,scenario,region,variable,unit))
+    ) +
+  
+  # historical
+  geom_point(data = hist.total.global %>% filter(unit=="Mt CO2/yr"),
+             aes(shape = "Historical"), colour="black") +
+  
+  theme_jsk()
+
+p.trajectory.co2.modelsubmitted.gcam
+
+
+```
+
+##### Timeseries for for problematic models (CO2-AFOLU)
+
+```{r}
+
+
+p.trajectory.co2.modelsubmitted.gcam <- ggplot(
+  mapping = aes(y = value, x = year, colour = model)
+) + 
+  facet_grid(~unit) +
+  
+  # model submitted
+  geom_line(
+      data = ar6like.infilled.emissions %>% filter(region=="World") %>% filter(variable=="Emissions|CO2|AFOLU") %>% filter(unit=="Mt CO2/yr") %>% filter(
+      year<=2050,
+      grepl(model, pattern="GCAM", fixed=T)
+    ) %>% mutate(model="GCAM (as submitted)"),
+      aes(group=interaction(model,scenario,region,variable,unit))
+    ) +
+  
+  # after infilling
+  geom_line(
+      data = ar6like.infilled.emissions %>% filter(region=="World") %>% filter_starts_with("AR6 climate diagnostics|Infilled") %>% 
+  remove_variable_firstlevel_match(match.string = "AR6 climate diagnostics\\|Infilled\\|") %>% filter(unit=="Mt CO2/yr") %>% filter(
+    year<=2050,
+    variable=="Emissions|CO2|AFOLU",
+      grepl(model, pattern="GCAM", fixed=T)
+    ) %>% mutate(model="GCAM (after harmonization)"),
+      aes(group=interaction(model,scenario,region,variable,unit))
+    ) +
+  
+  # historical
+  geom_point(data = hist.national %>% filter(region=="World") %>% filter_includes("Agriculture") %>% 
+    iamc_region_keep_one_level(-1) %>% 
+    iamc_variable_keep_one_level(-1) %>% filter(unit=="Mt CO2/yr"),
+             aes(shape = "Historical"), colour="black") +
+  
+  theme_jsk()
+
+p.trajectory.co2.modelsubmitted.gcam
+
+
+```
+
+
+### Analysis: difference CO2 in 2020
+```{r}
+
+co2.diff <- ar6.infilled.total.global %>% 
+  filter(year==2022) %>% 
+  left_join(
+    hist.total.global %>% distinct(region,unit,year,value) %>% 
+    rename(historical.value = value)
+  ) %>% simplify_model_names() %>% 
+  filter(unit=="Mt CO2/yr")
+
+co2.diff
+
+p.diff.2020.by.model <- ggplot(co2.diff, aes(y=`historical.value` - `value`, fill=`model`)) +
+  facet_wrap(.~unit) +
+  geom_boxplot()
+
+p.diff.2020.by.model
+```
+
+### Analysis: CO2 cumulative
+
+##### Missing variables in the Scenario Explorer
+```{r}
+# tbd
+```
+
+
+### Analysis: Harmonization differences
+
+##### Data
+```{r}
+
+harm.folder <- here(IAM_SCENARIOS_LOCATION, "harmonization_experiments", "the_hague")
+
+# IAM 
+native <- scenarios %>% filter(region=="World") %>% mutate(Type = "Not Harmonized", `Harmonization method`="None")
+
+# history
+harm.hist <- vroom(file.path(harm.folder, "cmip7_history_world_0011.csv")) %>% iamc_wide_to_long() %>% mutate(`Harmonization method`="None", Type = "History")
+
+# harmonization options
+harm.def <- vroom(file.path(harm.folder, "infilled.csv")) %>% iamc_wide_to_long() %>% mutate(`Harmonization method`="Default (AR6)")
+harm.afolu2050 <- vroom(file.path(harm.folder, "harmonised_afolu2050.csv")) %>% iamc_wide_to_long() %>% mutate(`Harmonization method`="AFOLU 2050 convergence")
+harm.all2050 <- vroom(file.path(harm.folder, "harmonised_all2050.csv")) %>% iamc_wide_to_long() %>% mutate(`Harmonization method`="All 2050 convergence")
+
+harm.exps <- harm.def %>% 
+  bind_rows(harm.afolu2050) %>% 
+  bind_rows(harm.all2050) %>% 
+  mutate(Type = "Harmonized")
+
+```
+##### Visualise: example
+```{r}
+
+p.harm.example <- ggplot(
+  harm.exps  %>% 
+    bind_rows(native) %>% 
+    filter(variable%in%c("Emissions|BC", "Emissions|CO2|AFOLU")) %>% 
+    filter(model=="MESSAGEix-GLOBIOM 2.1-M-R12",
+           scenario=="SSP1 - Very Low Emissions",
+           year<=2060, year>=2010),
+  aes(x=year,y=value)
+) + 
+  facet_wrap(~variable, scales = "free_y") +
+  geom_point(
+    data = harm.hist %>% filter(variable%in%c("Emissions|BC", "Emissions|CO2|AFOLU"), year>=2010)
+  ) +
+  geom_line(
+    aes(group = interaction(model,scenario,region,unit,`Harmonization method`, Type),
+        colour = `Harmonization method`,
+        linetype = `Harmonization method`),
+    linewidth = 1.2
+  ) +
+  theme_jsk() +
+  labs(title = "Different harmonization experiments", subtitle = "MESSAGE (VLLO-SSP1)") +
+  mark_history() +
+  theme(legend.box="vertical", legend.margin=margin())
+
+p.harm.example
+
+save_ggplot(
+      p = p.harm.example,
+      h = 150,
+      w = 250,
+      f = here("data", "data_vetting", "figures", "other", "harmonization_experiments_example")
+    )
+
+```
+
+##### Visualise: net-zero CO2
+```{r}
+# method
+#' Estimate the Year When a Value Crosses Zero
+#'
+#' This function estimates the year when a specified column (`value_col`) crosses zero
+#' for each combination of grouping columns (`group_cols`). Two methods are available:
+#' returning the first year before the reported crossing year ("before-reported-model-year")
+#' or estimating the crossing year using linear interpolation ("linear-interpolation").
+#'
+#' @param df A data frame containing the data to analyze.
+#' @param value_col A string specifying the column name containing the values to check for zero-crossing. Default is `"value"`.
+#' @param year_col A string specifying the column name containing the years. Default is `"year"`.
+#' @param group_cols A vector of strings specifying the columns that define groups, typically `"model"` and `"scenario"`.
+#' @param mode A string specifying the estimation method. Options are:
+#'   - `"before-reported-model-year"`: Returns the year before the zero-crossing.
+#'   - `"linear-interpolation"`: Uses linear interpolation to estimate the exact year of crossing.
+#'   Default is `"linear-interpolation"`.
+#' @param threshold_value A numeric value specifying the threshold for which the crossing is investigated. Default is `0`.
+#'
+#' @return A data frame containing the group columns and the estimated crossing year.
+#'   The output varies depending on the selected `mode`:
+#'   - For `"before-reported-model-year"`, the output contains the first year before the crossing.
+#'   - For `"linear-interpolation"`, the output contains interpolated years.
+#'
+#' @examples
+#' # Example dataset
+#' df <- data.frame(
+#'   model = c("A", "A", "A", "B", "B", "B"),
+#'   scenario = c("X", "X", "X", "Y", "Y", "Y"),
+#'   year = c(2020, 2021, 2022, 2020, 2021, 2022),
+#'   value = c(-1, 0.5, 1.5, 2, -1, -2)
+#' )
+#'
+#' # Estimate crossing year with default mode
+#' estimate_crossing_year(df, mode = "before-reported-model-year")
+#'
+#' # Estimate crossing year with linear interpolation
+#' estimate_crossing_year(df)
+#'
+#' @import dplyr
+#' @export
+estimate_crossing_year <- function(data, value_col = "value", year_col = "year", group_cols = c("model", "scenario"),
+                                   mode = "linear-interpolation",
+                                   threshold_value = 0) {
+  # Ensure the columns exist
+  stopifnot(all(c(value_col, year_col, group_cols) %in% colnames(data)))
+
+  # Apply the threshold
+  data <- data %>% mutate(value = value - threshold_value)
+
+  # Convert character column names to symbols
+  group_syms <- rlang::syms(group_cols)
+
+  if (mode == "before-reported-model-year") {
+    # Identify the first year before a crossing occurs
+    crossing_years <- data %>%
+      arrange(!!!group_syms, .data[[year_col]]) %>% # Use symbols for grouping
+      group_by(!!!group_syms) %>%
+      mutate(sign_change = sign(.data[[value_col]]) != lag(sign(.data[[value_col]]))) %>% # Detect sign change
+      filter(!is.na(sign_change) & sign_change) %>% # Remove NA and keep rows with a sign change
+      slice_head(n = 1) %>% # Get the first crossing for each group
+      summarise(crossing_year = first(.data[[year_col]]), .groups = "drop") # Report the first year with a sign change
+
+  } else if (mode == "linear-interpolation") {
+    # Use linear interpolation to estimate the crossing year
+    crossing_years <- data %>%
+      arrange(!!!group_syms, .data[[year_col]]) %>% # Use symbols for grouping
+      group_by(!!!group_syms) %>%
+      mutate(
+        sign_prev = lag(sign(.data[[value_col]])), # Previous sign
+        year_prev = lag(.data[[year_col]]),       # Previous year
+        value_prev = lag(.data[[value_col]])      # Previous value
+      ) %>%
+      filter(!is.na(sign_prev) & sign(.data[[value_col]]) != sign_prev) %>% # Keep sign changes
+      reframe(
+        crossing_year = year_prev + (.data[[year_col]] - year_prev) * abs(value_prev) /
+          (abs(value_prev) + abs(.data[[value_col]])),
+        !!!group_syms # Include group columns in the result
+      )
+  } else {
+    stop("Invalid mode specified. Choose 'before-reported-model-year' or 'linear-interpolation'.")
+  }
+
+  return(crossing_years)
+}
+estimate_net_zero <- function(df, var="Emissions|CO2", region="World",
+                              mode = "only-linear-interpolation",
+                              rounding_year=TRUE,
+                              ...){
+  df <- df %>% filter(variable==var, region=="World")
+
+  if (mode=="only-linear-interpolation"){
+    out <- estimate_crossing_year(df, ...) %>% mutate(mode="linear-interpolation") %>%
+      mutate(variable = var)
+  } else if (mode=="only-before-reported-model-year"){
+    out <- estimate_crossing_year(df, mode="before-reported-model-year", ...) %>% mutate(mode="before-reported-model-year") %>%
+      mutate(variable = var)
+  } else if (mode=="all-methods"){
+    out <- estimate_crossing_year(df, ...) %>% mutate(mode="linear-interpolation") %>%
+      bind_rows(estimate_crossing_year(df, mode = "before-reported-model-year", ...) %>% mutate(mode="before-reported-model-year")) %>%
+      mutate(variable = var)
+  }
+
+  # clean up
+  out <- out %>% rename(net_zero_year = crossing_year)
+  if (rounding_year == TRUE){
+    out <- out %>% mutate(net_zero_year = round(net_zero_year))
+  }
+
+  return(out)
+}
+
+# data
+harm.co2 <- harm.exps  %>%
+  filter(variable%in%c("Emissions|CO2|AFOLU", "Emissions|CO2|Energy and Industrial Processes")) %>%
+    bind_rows(native %>% filter(
+      variable %in% c(
+        "Emissions|CO2|AFOLU",
+        "Emissions|CO2|Energy and Industrial Processes",
+        "Emissions|CO2|Product Use",
+        "Emissions|CO2|Waste",
+        "Emissions|CO2|Other",
+        "Emissions|CO2|Other Capture and Removal"
+      )
+    )) %>%
+  reframe(
+    value = sum(value),
+    .by = c("model", "scenario", "region", "unit", "year", "Harmonization method", "Type")
+  ) %>% mutate(variable="Emissions|CO2")
+
+harm.nzco2.effect <- estimate_net_zero(harm.co2, group_cols = c("model", "scenario", "region", "Harmonization method", "Type"))
+
+nz.ranges <- ggplot(harm.nzco2.effect %>% simplify_model_names(keep.full.model.name = T) %>% add_scenariomip_targets_to_IAM_scenarios(), 
+                    aes(x=net_zero_year, y=`Harmonization method`)) +
+  # facet_grid(~target) +
+  geom_boxplot(
+    aes(fill=target)
+  ) +
+  # geom_point(aes(shape=model,colour=model)) +
+  theme_jsk() + mark_history(sy = 2025) +
+  theme(panel.grid.major.x = element_line(colour = "lightgrey"),
+        panel.grid.minor.x = element_line(colour = "lightgrey", linetype = "dotted"),
+        panel.grid.major.y = element_blank()) +
+  ylab(NULL) +
+  scale_x_continuous(breaks=seq(2020,2100,10), limits = c(2020,2100)) +
+  labs(title = "Net-zero years", subtitle = "Harmonization method") +
+  guides(legend.position = "left", legend.box = "vertical", legend.margin = margin())
+nz.ranges
+
+save_ggplot(
+      p = nz.ranges,
+      h = 110,
+      w = 290,
+      f = here("data", "data_vetting", "figures", "other", "harmonization_experiments_nzco2")
+    )
+
+```
+
+
+### Analysis: F-Gases
+
+##### Visuals
+```{r}
+
+# make: 
+# - [ ] by target (colour: model, linetype: ssp)
+# - [ ] check of whether f-gases add up to the basket
+
+fgases <- scenarios %>% filter(variable=="Emissions|F-Gases", region=="World")
+
+
+
+
+
+
+p.fgases <- ggplot(fgases %>% filter(year<=2100) %>% mutate(full.model=model) %>% simplify_model_names() %>% 
+                     add_scenariomip_targets_to_IAM_scenarios() %>% 
+                     add_ssp_basis_to_IAM_scenarios(),
+                   aes(x=year, y=value)) +
+  facet_wrap(~scenario) +
+  geom_line(
+    aes(
+      group = interaction(full.model, scenario, region, variable),
+      colour = model
+    )
+  ) +
+  theme_jsk() +
+  mark_history() +
+  ylab("Mt CO2-equiv/yr")
+
+p.fgases
+
+```
+
+##### Checking aggregation
+```{r}
+
+
+```
+
+### Analysis: net-zero GHG climate
+##### Checking aggregation
+```{r}
+nzGHG.variable <- "AR6 climate diagnostics|Infilled|Emissions|Kyoto Gases (AR6-GWP100)"
+
+nzGHG <- ar6like.infilled.emissions %>% filter(
+  variable == nzGHG.variable
+) %>% #simplify_model_names(keep.full.model.name = T) %>% 
+  add_scenariomip_targets_to_IAM_scenarios() %>% 
+  filter(target%in%c("VLLO", "L"))
+
+slices.per.scenario <- estimate_net_zero(nzGHG, var=nzGHG.variable, mode="only-before-reported-model-year") %>%
+  mutate(
+    nz.start.year = net_zero_year - 5,
+    nz.end.year = pmin(net_zero_year + 10, 2100)
+  ) %>% 
+  distinct(model,scenario,nz.start.year,net_zero_year,nz.end.year)
+
+median.temps <- ar6like.temp50 %>% distinct(model,scenario,region,year,value) %>% mutate(version = "AR6 workflow MAGICC") %>% 
+  bind_rows(
+    # fair new median
+    vroom(file.path(IAM_SCENARIOS_LOCATION, "fair", "temperature_median.csv")) %>% 
+      iamc_wide_to_long() %>% 
+      distinct(model,scenario,region,year,value) %>% mutate(version = "New workflow FAIR")
+  )
+
+years.around.nzGHG <- median.temps %>% left_join(slices.per.scenario)
+years.around.nzGHG.min <- years.around.nzGHG %>% 
+  filter(year==nz.start.year) %>% 
+  rename(end.T = value, end.year = year) %>% 
+  select(model,scenario,end.year,end.T, version)
+years.around.nzGHG.max <- years.around.nzGHG %>% 
+  filter(year==nz.end.year) %>% 
+  rename(start.T = value, start.year = year) %>% 
+  select(model,scenario,start.year,start.T, version)
+years.around.nzGHG <- years.around.nzGHG.min %>% left_join(years.around.nzGHG.max)
+diff.T.nzGHG <- years.around.nzGHG %>% 
+  mutate(diff.per.decade = (end.T - start.T)/(end.year - start.year) * 10 )
+
+
+# # plot emissions pathways selected
+# p.select.nzGHG <- ggplot(
+#   nzGHG %>% left_join(slices.per.scenario),
+#   aes(x=year, y=value)
+# ) + 
+#   facet_grid(target~model) +
+#   geom_line(
+#     aes(colour=model, linetype = target,
+#         group = interaction(model,scenario,region,variable,target))
+#   ) +
+#   geom_point(
+#     data = years.around.nzGHG %>% left_join(nzGHG) %>% filter(year==end.year | year==start.year),
+#     aes(x = start.year)
+#   ) +
+#   geom_point(
+#     data = years.around.nzGHG %>% left_join(nzGHG) %>% filter(year==end.year | year==start.year),
+#     aes(x = end.year)
+#   )
+# 
+# p.select.nzGHG
+
+
+# plot decadal change around net-zero GHG
+p.deltaT.nzGHG <- ggplot(
+  diff.T.nzGHG %>% add_scenariomip_targets_to_IAM_scenarios() %>% simplify_model_names(),
+  aes(x=version, y=diff.per.decade)
+) + 
+  facet_grid(target~model) +
+  geom_hline(yintercept=0) +
+  geom_boxplot() +
+  theme_jsk() +
+  ylab("Temperature change per decade around net-zero GHGs")
+
+p.deltaT.nzGHG
+
+```
+
+
+
+
+
+# Other
+
+### Land use 
+```{r}
+
+scenarios.alldata <- load_csv_iamc(file.path(IAM_SCENARIOS_LOCATION, IAM_SCENARIOS_FILE), mode="fast")
+
+secenarios.land <- scenarios.alldata %>% filter(grepl(Variable, pattern="Land", fixed=T))
+
+
+#' questions Ben:
+#' - [ ] development blueprint of the representative scenarios and which modelling teams they will be
+#' - [ ] ...
+#' 
+#' current issues:
+#' - how CDR is split in different bioenergy types
+#' 
+#' What can be developed by BECCSMIP:
+#' - [ ] best-case variable list (and levels below)
+#' 
+#' CMIP6 harmonization:
+#' - did e.g. infilling, like wood harvest from GCAM given to MESSAGE
+#' - e.g. IMAGE providing urban area for all scenarios
+#' - some cropland infilling based on ratios
+#' 
+#' 
+#' 
+#' 
+#' Extension guidance:
+#' - Ben: will come up with a blueprint.
+#' -> task team is the right group for this, but never got into the question of how to disaggregate this into land-use change (which will be the most difficult)
+#' -> need to scale:
+#'      * harvest rate fluxes (with captured shares remaining constant)
+#'      * harvest rate fluxes (with extened capture share trends; until some bound; e.g. until 2150 and after that constant)
+#' - considerations:
+#'      * only allowing harvest rate to change is easier than letting 2 things change
+#'      * don't start with 'high-overshoot' (could do simple CMIP6 protocol here anyway, not the CDRMIP/BECCSMIP interactive experiments)
+#' -> timeline:
+#'      * fast-track: only two extensions
+#'      * scenariomip: all until 2150
+#'      
+#' -> change split between high and high-overshoot in 2150.
+#' 
+#' 
+#' 
+#' bring up in the hague:
+#' -> current solution of ScenarioMIP: is that definitely what we want?
+#'    * double-check with IAM teams; point out the CMIP7 paper showing until 2100. (https://egusphere.copernicus.org/preprints/2024/egusphere-2024-3874/egusphere-2024-3874.pdf)
+#' -> point out that 2100-beyond extension needs more thinking on the scaling; Ben and Louise will start a draft up
+#'    * need to be in the ScenarioMIP paper?
+#'    
+#' timeline for historical
+#' -> first groups: April 
+#' 
+#' 
+#' Paper writing for extension:
+#' -> paragraph in ScenarioMIP paper
+#' -> emissions harmonization and climate emulator + extensions paper
+#' -> LUH3 paper for some extension
+#' -> dedicated CDRMIP excercise
+#' ...
+#' 
+#' CMIP6: no harvest of crops information (each ESM had own algorithm for what area is harvested and where)
+#' CMIP6: wood harvesting is provided spatially (based on where carbon was available in the forest)
+#' -> now need to think about bioenergy crops, at the regional level, and how that will change in the regional patterns. Q: do we need to provide the share (standard ScenarioMIP: no, but more interactive: yes -- requires data with placeholder values available now). Fraction removed for energy. 
+#' 
+#' 
+#' default assumption:
+#' -> keep crops in same gridcell, but increase/decrease the share in that grid (with some under/overflow)
+#' -> other option: increase nearest neighbours
+#' 
+#' new:
+#' - category 'plantations', with 'harvest'
+#' 
+#' 
+#' Timeline for this document:
+#' Ben:
+#' -> come up with first document; will come up with tier1/tier2/tier3 
+#'    sequestration fraction
+#' Louise:  
+#' -> land-use protocol (differences from CMIP6 to CMIP7)?
+#' All:
+#' -> bullet points for the scaling
+#' 
+#' 
+
+
+
+
+```
+
+
+
+### Vetting criteria 
+
+##### Primary Energy Biomass
+```{r}
+
+scenarios.biomass.global <- load_csv_iamc(file.path(IAM_SCENARIOS_LOCATION, IAM_SCENARIOS_FILE), mode="fast") %>% 
+  filter(Variable=="Primary Energy|Biomass", Region=="World") %>% 
+  iamc_wide_to_long(upper.to.lower = T) %>% 
+  filter(year<=2100)
+  
+
+scenarios.biomass.global.VLLO <- scenarios.biomass.global %>% 
+  add_scenariomip_targets_to_IAM_scenarios() %>% 
+  filter(target=="VLLO") %>% 
+  filter(value!=0) %>% # ad-hoc, AIM reporting
+  simplify_model_names(keep.full.model.name = T) %>% 
+  # apply threshold
+  mutate(biomass_thres100 = ifelse(variable=="Primary Energy|Biomass" & value>100, 1, 0)) 
+  
+scenarios.biomass.global.VLLO.pass <- scenarios.biomass.global.VLLO %>% 
+  mutate(Passing = "All scenarios") %>% 
+  bind_rows(
+    scenarios.biomass.global.VLLO %>% 
+      filter(!any(biomass_thres100 == 1), .by = c("model", "scenario")) %>% 
+      mutate(Passing = "Meeting criterion")
+  )
+
+
+p.plot.PE.biomass.w.threshold <- ggplot(
+  scenarios.biomass.global.VLLO.pass ,
+  aes(x=year,y=value)
+) +
+  facet_grid(~Passing) +
+  geom_line(
+    aes(group=interaction(full.model.name,scenario,region,variable,unit),
+        colour=model),
+  ) +
+  geom_hline(yintercept = 100, linetype="dashed", linewidth = 1.5) +
+  theme_jsk() +
+  mark_history() +
+  scale_color_manual(values = plot.model.colors) +
+  ylim(0,300) +
+  guides(
+      colour = "none"
+    ) +
+  labs(y="EJ/yr",
+       title = "Primary Energy|Biomass",
+       subtitle = "VLLO")
+
+p.plot.PE.biomass.w.threshold
+
+save_ggplot(
+      p = p.plot.PE.biomass.w.threshold,
+      h = 150,
+      w = 250,
+      f = here("data", "data_vetting", "figures", "per-scenariotarget", "VLLO_biomass_100ej")
+    )
+
+```
+
+

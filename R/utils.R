@@ -260,7 +260,25 @@ filter_ends_with <- function(df, variable.string){
 #' @export
 #'
 #' @examples
-filter_includes <- function(df, variable.string, inverse = F){
+filter_includes <- function(df, match.string, column = "variable", inverse = F){
+  if (column == "variable"){
+    return(
+      filter_variable_includes(df, variable.string=match.string, inverse=inverse)
+    )
+  }
+}
+
+#' Filter variables that include a certain string
+#'
+#'
+#' @param df
+#' @param variable.string
+#'
+#' @return df: filtered df
+#' @export
+#'
+#' @examples
+filter_variable_includes <- function(df, variable.string, inverse = F){
   if (inverse == F){
     df %>%
       filter(
@@ -273,8 +291,101 @@ filter_includes <- function(df, variable.string, inverse = F){
     df %>%
       filter(
         !grepl(x=variable,
-              pattern=variable.string,
+               pattern=variable.string,
+               fixed=T)
+      ) %>%
+      return()
+  }
+
+}
+
+#' Filter models that include a certain string
+#'
+#'
+#' @param df
+#' @param model.string
+#'
+#' @return df: filtered df
+#' @export
+#'
+#' @examples
+filter_model_includes <- function(df, model.string, inverse = F){
+  if (inverse == F){
+    df %>%
+      filter(
+        grepl(x=model,
+              pattern=model.string,
               fixed=T)
+      ) %>%
+      return()
+  } else if (inverse == T){
+    df %>%
+      filter(
+        !grepl(x=model,
+               pattern=model.string,
+               fixed=T)
+      ) %>%
+      return()
+  }
+
+}
+
+#' Filter regions that include a certain string
+#'
+#'
+#' @param df
+#' @param region.string
+#'
+#' @return df: filtered df
+#' @export
+#'
+#' @examples
+filter_region_includes <- function(df, region.string, inverse = F){
+  if (inverse == F){
+    df %>%
+      filter(
+        grepl(x=region,
+              pattern=region.string,
+              fixed=T)
+      ) %>%
+      return()
+  } else if (inverse == T){
+    df %>%
+      filter(
+        !grepl(x=region,
+               pattern=region.string,
+               fixed=T)
+      ) %>%
+      return()
+  }
+
+}
+
+#' Filter scenarios that include a certain string
+#'
+#'
+#' @param df
+#' @param scenario.string
+#'
+#' @return df: filtered df
+#' @export
+#'
+#' @examples
+filter_scenario_includes <- function(df, scenario.string, inverse = F){
+  if (inverse == F){
+    df %>%
+      filter(
+        grepl(x=scenario,
+              pattern=scenario.string,
+              fixed=T)
+      ) %>%
+      return()
+  } else if (inverse == T){
+    df %>%
+      filter(
+        !grepl(x=scenario,
+               pattern=scenario.string,
+               fixed=T)
       ) %>%
       return()
   }
@@ -541,6 +652,29 @@ iamc_long_to_wide <- function(df){
   return(df)
 }
 
+##### Bring in IAMC style ------------------------------------------------------
+# Custom function to reorder columns
+wide_sort_columns <- function(df) {
+  # Columns to place first
+  first_cols <- c("model", "scenario", "region", "variable", "unit")
+
+  # Identify numeric columns (excluding first_cols)
+  numeric_cols <- names(df) %>%
+    setdiff(first_cols) %>%
+    .[sapply(df[.], is.numeric)] %>%
+    sort()
+
+  # Identify remaining columns (non-numeric)
+  other_cols <- names(df) %>%
+    setdiff(c(first_cols, numeric_cols))
+
+  # Reorder columns
+  df %>%
+    select(all_of(first_cols), all_of(numeric_cols), all_of(other_cols)) %>%
+    return()
+}
+
+
 ##### Return unique occurernces of IAMC columns --------------------------------
 
 #' Return unique variables
@@ -712,7 +846,12 @@ Scenario_unique <- function(df){
 }
 
 ##### Simplify Data ------------------------------------------------------------
-simplify_model_names <- function(df){
+simplify_model_names <- function(df, keep.full.model.name=F){
+
+  if (keep.full.model.name){
+    df <- df %>% mutate(full.model.name = model)
+  }
+
   df %>%
     mutate_cond(substr(model,1,nchar("AIM"))=="AIM", model="AIM") %>%
     mutate_cond(substr(model,1,nchar("COFFEE"))=="COFFEE", model="COFFEE") %>%
@@ -1072,6 +1211,29 @@ iamc_variable_keep_two_levels <- function(df, levels){
 }
 
 
+#' Keep only one level (between pipes) of the IAMC region column
+#'
+#' Note: does not check against creating duplicate region names.
+#'
+#' @param df
+#' @param level
+#'
+#' @return df with altered region column strings
+#' @export
+#'
+#' @examples
+iamc_region_keep_one_level <- function(df, level){
+
+  df <- df %>%
+    mutate(str.split = strsplit(region, "|", fixed = TRUE)) %>%
+    mutate(region = sapply(str.split,
+                             function(x) if (length(x) >= abs(level)) ifelse(level>0,x[[level]],x[[length(x)+level+1]]) else NA)) %>%
+    select(-str.split)
+
+  return(df)
+}
+
+
 # Load necessary libraries
 library(dplyr)
 library(stringr)
@@ -1092,7 +1254,7 @@ remove_variable_firstlevel_match <- function(df, match.string) {
   # Replace the matching pattern at the start of the string
   df %>%
     mutate(
-      variable = str_replace(variable, paste0("^", match.string, "\\|"), "")
+      variable = str_replace(variable, paste0("^", match.string), "")
     )
 }
 
@@ -1112,9 +1274,32 @@ remove_variable_lastlevel_match <- function(df, match.string) {
   # Replace the matching pattern at the end of the string
   df %>%
     mutate(
-      variable = str_replace(variable, paste0("\\|", match.string, "$"), "")
+      variable = str_replace(variable, paste0(match.string, "$"), "")
     )
 }
+
+# Function: Remove a specific first-level match from the region column
+# @param df A data frame containing a column named `region`.
+# @param match.string A string to be matched and removed if it appears at the start of the `region` column, followed by "|".
+# @return A modified data frame with the specified first-level match removed from the `region` column.
+remove_region_firstlevel_match <- function(df, match.string) {
+  # Input validation
+  if (!"region" %in% colnames(df)) {
+    stop("The data frame must contain a column named 'region'.")
+  }
+  if (!is.character(match.string) || length(match.string) != 1) {
+    stop("`match.string` must be a single character string.")
+  }
+
+  # Replace the matching pattern at the start of the string
+  df %>%
+    mutate(
+      region = str_replace(region, paste0("^", match.string, "\\|"), "")
+    )
+}
+
+
+
 
 
 

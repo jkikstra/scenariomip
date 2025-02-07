@@ -42,7 +42,6 @@ scenarios <- scenarios_raw %>%
 scenarios_raw_industrial <- scenarios %>%
   filter(
     sector %in% c(
-      # "Energy|Supply",
       "Energy|Demand|Industry",
       "Energy|Demand|Other Sector",
       "Industrial Processes",
