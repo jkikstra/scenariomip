@@ -734,6 +734,7 @@ for (m in (scenarios.global.with.targets %>% pull(model) %>% unique()) ){
     "Emissions|CO2|AFOLU",
     "Emissions|CO2|Energy and Industrial Processes",
     "Emissions|CH4",
+    # "Emissions|CH4|AFOLU", # not in emulator emissions
     "Emissions|Sulfur",
     
     "Emissions|BC",
@@ -1520,6 +1521,41 @@ secenarios.land <- scenarios.alldata %>% filter(grepl(Variable, pattern="Land", 
 ```
 
 
+##### CH4 AFOLU
+```{r}
+ch4afolu <- scenarios %>% filter(region=="World") %>% add_scenariomip_targets_to_IAM_scenarios() %>% filter(target=="VLLO") %>% filter(variable=="Emissions|CH4|AFOLU")
+
+p.ch4afolu <- ggplot(ch4afolu, 
+                     aes(x=year,y=value,
+                         group=interaction(model,scenario,variable,region))) +
+  geom_line(colour="grey") +
+  geom_line(data=. %>% filter_model_includes("MESSAGE"),
+            aes(colour=model)) +
+  theme_jsk() +
+  mark_history() +
+  labs(title = "CH4|AFOLU reductions (VLLO)",
+       subtitle = "Other models for VLLO",
+       y = "Emissions|CH4|AFOLU [Mt CH4/yr]")
+
+p.ch4afolu
+
+
+p.ch4afolu.normalised <- ggplot(ch4afolu %>% normalise_iamc_long(starting.year=2025), 
+                     aes(x=year,y=value,
+                         group=interaction(model,scenario,variable,region))) +
+  geom_line(colour="grey") +
+  geom_line(data=. %>% filter_model_includes("MESSAGE"),
+            aes(colour=model)) +
+  theme_jsk() +
+  mark_history() +
+  labs(title = "CH4|AFOLU reductions (VLLO)",
+       subtitle = "Other models for VLLO",
+       y = "Emissions|CH4|AFOLU normalised to 2025")
+
+p.ch4afolu.normalised
+
+```
+
 
 ### Vetting criteria 
 
@@ -1582,3 +1618,63 @@ save_ggplot(
 ```
 
 
+### Some quick calculations for JUSTMIP (CO2 budget)
+
+```{r}
+scenarios_co2 <- scenarios %>% 
+  filter(Variable=="Emissions|CO2", Region=="World", Scenario=="SSP1 - Very Low Emissions") 
+
+scenarios_co2_for_excel <- scenarios_co2 %>% select(Model, Scenario, Region, Variable, Unit, `2010`, `2015`, `2020`, `2025`, `2030`, `2035`, `2040`, `2045`, `2050`, `2055`, `2060`, `2070`, `2080`, `2090`, `2100`)
+
+write_delim(x = scenarios_co2_for_excel, delim = ",", file = file.path(IAM_SCENARIOS_LOCATION, "emissions_co2_VLLOSSP1.csv")) # use for `budget_calc_ScenarioMIP_VLLO.xlsx`
+
+
+# interpolate and calculate
+# Function to expand and interpolate each group
+library(zoo)
+expand_and_interpolate <- function(df, full_years = 2015:2100) {
+  # Expand to full range of years
+  df_full <- data.frame(year = full_years) %>%
+    left_join(df, by = "year") %>%
+    arrange(year)
+  
+  # Interpolate missing values
+  df_full$value <- na.approx(df_full$value, df_full$year, rule = 2)
+  
+  return(df_full)
+}
+iamc_long_interpolate <- function(df, full_years = 2015:2100){
+  df %>% 
+    complete(model, scenario, region, variable, unit, year = full_years) %>%  # Ensure all combinations exist
+    group_by(model, scenario, region, variable, unit) %>%
+    group_modify(~ expand_and_interpolate(.x)) %>%
+    ungroup() %>% 
+    return()
+}
+
+scenarios_co2_interpolated <- scenarios_co2 %>%  
+  iamc_wide_to_long(upper.to.lower = T) %>% 
+  iamc_long_interpolate()
+
+scenarios_co2_infilled <- ar6like.infilled.emissions %>% 
+  filter(scenario=="SSP1 - Very Low Emissions") %>% 
+  filter_includes("CO2") %>% filter_includes("Infilled") %>% 
+  reframe(
+    value = sum(value),
+    .by = c("model", "scenario", "region", "unit", "year")
+  ) %>% 
+  mutate(variable = "AR6 climate diagnostics|Infilled|Emissions|CO2")
+
+co2_budget_starting_2025 <- scenarios_co2_interpolated %>% 
+  bind_rows(scenarios_co2_infilled) %>% 
+  filter(year>=2025, year<=2100) %>% 
+  reframe(GtCO2=sum(value)/1e3,
+          .by = c("model", "scenario", "region", "variable")) %>% 
+  pivot_wider(
+    names_from = variable, values_from = GtCO2
+  )
+
+co2_budget_starting_2025
+
+write_delim(x = co2_budget_starting_2025, delim = ",", file = file.path(IAM_SCENARIOS_LOCATION, "emissions_co2_from2025.csv"))
+```
