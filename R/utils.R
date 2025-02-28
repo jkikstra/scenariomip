@@ -958,6 +958,36 @@ add_emissions_processing_col <- function(df) {
   return(df)
 }
 
+##### ScenarioMIP-specific -----------------------------------------------------
+add_scenariomip_targets_to_IAM_scenarios <- function(df){
+  df %>% mutate(target = NA) %>%
+    mutate_cond(grepl(x=scenario, pattern="High Emissions", fixed=T), target = "H") %>%
+    mutate_cond(grepl(x=scenario, pattern="Medium Emissions", fixed=T), target = "M") %>%
+    mutate_cond(grepl(x=scenario, pattern="Low Emissions", fixed=T), target = "L") %>% # needs to come before ML and VL, to correctly overwrite
+    mutate_cond(grepl(x=scenario, pattern="Medium-Low Emissions", fixed=T), target = "ML") %>%
+    mutate_cond(grepl(x=scenario, pattern="Very Low Emissions", fixed=T), target = "VLLO") %>% # not the case for REMIND
+    mutate_cond(grepl(x=scenario, pattern="Low Overshoot", fixed=T), target = "VLHO") %>% # not the case for REMIND
+
+    return()
+}
+
+add_ssp_basis_to_IAM_scenarios <- function(df){
+  df %>% mutate(ssp=substr(scenario, start = 1, stop = 4))
+}
+
+add_sector_and_species_columns <- function(df){
+  df %>%
+    mutate(sector = str_replace(variable, "^Emissions\\|", "")) %>%
+    mutate(species = str_extract(sector, "^[^|]+")) %>%
+    mutate(sector = ifelse(
+      species==sector,
+      "Total",
+      str_replace(sector, paste0("^",species,"\\|"), "")
+    )) %>%
+    return()
+
+}
+
 ##### Adjusting "value" --------------------------------------------------------
 
 #' Normalise values in a long IAMC data frame to a starting year where the starting year value thus becomes 1
