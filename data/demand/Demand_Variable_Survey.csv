@@ -1,0 +1,86 @@
+,Please fill out:,,,,,,,
+,1 = Variable already reported,,,,,,,
+,2 = Able to report within two weeks based on existing scenario runs,,,,,,,
+,3 = Able to report with next full scenario submission,,,,,,,
+,Empty = not able to report,,,,,,,
+,,,,,,,,
+,,,,,,,,
+Variable,Unit,AIM 3.0,GCAM 7.1 scenarioMIP,IMAGE 3.4,MESSAGEix-GLOBIOM-GAINS 2.1-M-R12,REMIND-MAgPIE 3.4-4.8,WITCH 6.0,COFFEE
+Energy Service|Commercial|Floor Space,bn m2,,1,,1,,,
+Energy Service|Residential and Commercial|Floor Space,bn m2,,1,,1,1,,
+Energy Service|Residential|Floor Space,bn m2,,1,1,1,,,
+Energy Service|Residential|Cooling Degree Days,°C-days,,3,3,3,,,
+Energy Service|Residential|Heating Degree Days,°C-days,,3,3,3,,,
+Energy Service|Transportation|Freight,billion tkm/yr,1,1,1,3,1,1,3
+Energy Service|Transportation|Freight|Truck,billion tkm/yr,3,1,2,3,2,1,
+Energy Service|Transportation|Freight|Truck|Battery-Electric,billion tkm/yr,3,2,2,3,2,1,
+Energy Service|Transportation|Freight|Truck|Fuel-Cell-Electric,billion tkm/yr,3,2,2,3,2,1,
+Energy Service|Transportation|Freight|Truck|Internal Combustion,billion tkm/yr,3,2,2,3,2,1,
+Energy Service|Transportation|Freight|Truck|Plug-in Hybrid,billion tkm/yr,3,2,2,3,2,1,
+Energy Service|Transportation|Passenger,billion pkm/yr,1,1,1,1,1,1,3
+Energy Service|Transportation|Passenger|Active Transport [Share],%,,1,2,,,,
+Energy Service|Transportation|Passenger|Public Transport [Share],%,,1,2,2,2,,
+Energy Service|Transportation|Passenger|Road,billion pkm/yr,1,1,1,1,1,,
+Energy Service|Transportation|Passenger|Road|Light-Duty Vehicle,billion pkm/yr,,1,2,2,,,
+Production|Chemicals|Ammonia,Mt/yr,,1,1,1,,,3
+Production|Chemicals|Formaldehyde,Mt/yr,,,,,,,
+Production|Chemicals|Formaldehyde Resins,Mt/yr,,,,,,,
+Production|Chemicals|High-Value Chemicals,Mt/yr,,1,1,1,,,3
+Production|Chemicals|High-Value Chemicals|BTX,Mt/yr,,,,1,,,3
+Production|Chemicals|High-Value Chemicals|Ethylene,Mt/yr,,,,1,,,3
+Production|Chemicals|High-Value Chemicals|Propylene,Mt/yr,,,,1,,,3
+Production|Chemicals|Methanol,Mt/yr,,,1,1,,,3
+Production|Chemicals|Nitrogen Fertilizer,Mt/yr,,2,,1,,,
+Production|Chemicals|Plastics,Mt/yr,,,3,,,,3
+Production|Chemicals|Plastics|Primary,Mt/yr,,,3,,,,
+Production|Chemicals|Plastics|Secondary,Mt/yr,,,3,,,,
+Production|Iron and Steel|Iron,Mt/yr,,2,,,,,3
+Production|Iron and Steel|Iron Ore,Mt/yr,,,,,,,3
+Production|Iron and Steel|Iron|Pig Iron,Mt/yr,,,,,,,3
+Production|Iron and Steel|Iron|Sponge Iron,Mt/yr,,,,,,,3
+Production|Iron and Steel|Steel,Mt/yr,2,1,1,1,1,,3
+Production|Iron and Steel|Steel|Primary,Mt/yr,,,3,1,1,,3
+Production|Iron and Steel|Steel|Secondary,Mt/yr,,,3,1,1,,3
+Production|Non-Ferrous Metals|Aluminum,Mt/yr,,1,,1,,,
+Production|Non-Ferrous Metals|Aluminum Oxide,Mt/yr,,1,,,,,
+Production|Non-Ferrous Metals|Aluminum|Primary,Mt/yr,,,,1,,,
+Production|Non-Ferrous Metals|Aluminum|Secondary,Mt/yr,,,,1,,,
+Production|Non-Ferrous Metals|Bauxite,Mt/yr,,,,,,,
+Production|Non-Ferrous Metals|Copper,Mt/yr,,,,,,,
+Production|Non-Ferrous Metals|Copper|Primary,Mt/yr,,,,,,,
+Production|Non-Ferrous Metals|Copper|Secondary,Mt/yr,,,,,,,
+Production|Non-Ferrous Metals|Graphite,Mt/yr,,,,,,,
+Production|Non-Ferrous Metals|Lithium,Mt/yr,,,,,,,
+Production|Non-Ferrous Metals|Lithium|Primary,Mt/yr,,,,,,,
+Production|Non-Ferrous Metals|Lithium|Secondary,Mt/yr,,,,,,,
+Production|Non-Ferrous Metals|Manganese,Mt/yr,,,,,,,
+Production|Non-Ferrous Metals|Nickel,Mt/yr,,,,,,,
+Production|Non-Metallic Minerals|Bricks,Mt/yr,,,,,,,
+Production|Non-Metallic Minerals|Cement,Mt/yr,,1,1,1,1,,3
+Production|Non-Metallic Minerals|Cement Clinker,Mt/yr,,3,3,1,,,3
+Production|Non-Metallic Minerals|Glass,Mt/yr,,,,,,,
+Production|Non-Metallic Minerals|Limestone,Mt/yr,,3,,,,,
+Production|Pulp and Paper|Paper,Mt/yr,,1,3,,,,
+Production|Pulp and Paper|Pulp,Mt/yr,,,3,,,,
+Material Recycling|Aluminum,Mt/yr,,,,,,,
+Material Recycling|Aluminum [Share],%,,,,,,,
+Material Recycling|Chemicals,Mt/yr,,,,,,,
+Material Recycling|Chemicals [Share],%,,,,,,,
+Material Recycling|Plastics,Mt/yr,,,,,,,
+Material Recycling|Plastics [Share],%,,,,,,,
+Material Recycling|Steel,Mt/yr,,3,3,,,,
+Material Recycling|Steel [Share],%,,3,,,,,
+Stocks|Transportation|Light-Duty Vehicle,million,3,1,,,1,,
+Stocks|Transportation|Light-Duty Vehicle|Battery-Electric,million,3,1,,,1,,
+Stocks|Transportation|Light-Duty Vehicle|Fuel-Cell-Electric,million,3,1,,,1,,
+Stocks|Transportation|Light-Duty Vehicle|Internal Combustion,million,3,1,,,1,,
+Stocks|Transportation|Light-Duty Vehicle|Plug-in Hybrid,million,3,1,,,1,,
+Stocks|Transportation|Light-Duty Vehicle|Two-Wheeler,million,,1,,,,,
+Stocks|Transportation|Light-Duty Vehicle|Two-Wheeler|Battery-Electric,million,,1,,,,,
+Stocks|Transportation|Light-Duty Vehicle|Two-Wheeler|Internal Combustion,million,,1,,,,,
+Stocks|Transportation|Light-Duty Vehicle|Two-Wheeler|Plug-in Hybrid,million,,1,,,,,
+Stocks|Transportation|Truck,million,3,,,,1,1,
+Stocks|Transportation|Truck|Battery-Electric,million,3,,,,1,1,
+Stocks|Transportation|Truck|Fuel-Cell-Electric,million,3,,,,1,1,
+Stocks|Transportation|Truck|Internal Combustion,million,3,,,,1,1,
+Stocks|Transportation|Truck|Plug-in Hybrid,million,3,,,,,1,

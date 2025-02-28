@@ -15,20 +15,6 @@ here::i_am("scenariomip.Rproj")
 
 source(here("R","utils.R"))
 
-## Functions ----
-add_sector_and_species_columns <- function(df){
-  df %>%
-    mutate(sector = str_replace(variable, "^Emissions\\|", "")) %>%
-    mutate(species = str_extract(sector, "^[^|]+")) %>%
-    mutate(sector = ifelse(
-      species==sector,
-      "Total",
-      str_replace(sector, paste0("^",species,"\\|"), "")
-    )) %>%
-    return()
-
-}
-
 
 ## Agricultural Waste Burning (AgWast / AWB) and GDP per capita ----------------
 
