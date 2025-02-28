@@ -14,7 +14,7 @@ library("patchwork")
 library("ggthemes")
 library("ggsci")
 library("testthat")
-library("geomtextpath")
+# library("geomtextpath")
 library("stringr")
 
 here::i_am("vetting_iam.Rproj")

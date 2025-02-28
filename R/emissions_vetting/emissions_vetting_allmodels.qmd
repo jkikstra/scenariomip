@@ -18,7 +18,7 @@ library("testthat")
 library("stringr")
 library("ggthemes")
 
-here::i_am("vetting_iam.Rproj")
+here::i_am("scenariomip.Rproj")
 
 source(here("R","utils.R"))
 
@@ -33,7 +33,8 @@ source(here("R","utils.R"))
 
 ```{r}
 IAM_SCENARIOS_LOCATION <- here("data", "data_vetting", "scens")
-IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-01-20.csv"
+# IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-01-20.csv" # first version shared with the Teams
+IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-02-17.csv" # updated version (after REMIND comment)
 
 HISTORY.COUNTRY.AND.GLOBAL <- "cmip7_history_0002.csv"
 HISTORY.IAMREGIONS <- "iamc_regions_cmip7_history_0002.csv"
@@ -81,12 +82,6 @@ add_sector_and_species_columns <- function(df){
 
 # create helper columns (sector, species)
 scenarios_harmonization <- scenarios %>%
-  
-  # # test smaller scenario set for debugging
-  # filter_model_includes("GAINS") %>% 
-  # # filter_includes("Transportation") %>% filter_region_includes("Sub-S") %>% 
-  # filter_scenario_includes("SSP1 - Very Low Emissions") %>% 
-  
   add_sector_and_species_columns()
 
 
@@ -151,9 +146,9 @@ transport_sector_data <- transport_sector_data %>%
   mutate(`Energy|Demand|Transportation` = if ("Energy|Demand|Transportation" %in% names(.)) `Energy|Demand|Transportation` else 0) %>%
   mutate(`Energy|Demand|Transportation|Domestic Aviation` = if ("Energy|Demand|Transportation|Domestic Aviation" %in% names(.)) `Energy|Demand|Transportation|Domestic Aviation` else 0) %>% 
   # subtract domestic aviation
-  mutate(value = `Energy|Demand|Transportation` - `Energy|Demand|Transportation|Domestic Aviation`) %>% 
+  mutate(value = ifelse(is.na(`Energy|Demand|Transportation`), 0, `Energy|Demand|Transportation`) - ifelse(is.na(`Energy|Demand|Transportation|Domestic Aviation`), 0, `Energy|Demand|Transportation|Domestic Aviation`)) %>% 
   reframe(
-    value = sum(value, na.rm = T),
+    value = sum(value),
     .by = c("model", "scenario", "region", "unit", "year", "species")
   ) %>%
   mutate(sector = "Transportation Sector")
@@ -161,6 +156,7 @@ transport_sector_data <- transport_sector_data %>%
 transport_sector_data <- transport_sector_data %>%
   mutate(variable = paste0("Emissions|", species,"|",sector)) %>%
   select(model,scenario,region,variable,unit,year,value)
+
 
 # finalise 
 
@@ -265,6 +261,7 @@ hist.global.allspecies <- vroom(here("data", "data_vetting", "hist", HISTORY.COM
 ### ScenarioMIP draft paper emissions data used and run with FaIR
 
 ##### ScenarioMIP renaming functions
+
 ```{r}
 
 rename_scenariomip_shortletters <- function(df){
@@ -340,7 +337,6 @@ emulator_emissions <- emulator_emissions %>%
 
 ```
 
-
 ### Load AR6-like emissions harmonization data
 
 ```{r}
@@ -362,8 +358,7 @@ ar6like.temp50 <- load_csv_iamc(file.path(IAM_SCENARIOS_LOCATION, IAM_SCENARIOS_
 
 ```
 
-
-# Assessments of uncertainties and trends (total by species) 
+# Assessments of uncertainties and trends (total by species)
 
 ```{r}
 
@@ -389,7 +384,6 @@ sector.species.list <- hist.national %>% distinct(variable) %>%
 
 ```
 
-
 # Visualisation choices
 
 ```{r}
@@ -406,7 +400,6 @@ plot.model.colors <- c(
     "WITCH" = "#fb6a4a")
 
 ```
-
 
 # ALIGNMENT (HISTORY): Comparing with historical data
 
@@ -430,6 +423,19 @@ for (m in model.list.simple){
   p.data.hist <- hist.national %>% filter(region=="World") %>% 
         iamc_region_keep_one_level(-1) %>% 
         iamc_variable_keep_one_level(-1)
+  p.data.hist <- p.data.hist %>% 
+    filter(variable!="Total") %>% # remove separate totals of each historical data source
+    bind_rows(
+      # add combined total of historical data sources
+      p.data.hist %>% filter(variable=="Total") %>% 
+        reframe(
+          value = sum(value),
+          .by = c("scenario", "variable", "region", "unit", "year")
+        ) %>% 
+        mutate(model = p.data.hist %>% pull(model) %>% unique() %>% paste(collapse = "+"))
+    )
+  
+  
   
   p.emissions.by.model.sector.global <- ggplot(
     p.data.model,
@@ -527,7 +533,6 @@ for (m in model.list.simple){
 ```
 
 The `echo: false` option disables the printing of code (only output is displayed).
-
 
 ### Regional (for each model separately)
 
@@ -699,10 +704,10 @@ for (m in names(cd.model.list)){
 
 ```
 
-
 # ALIGNMENT (FUTURE): Comparing with ScenarioMIP paper emissions lines
 
 ### Create the dataset: left_join targets to each scenario
+
 ```{r}
 # scenarios
 scenarios.global.with.targets <- scenarios %>%
@@ -716,7 +721,9 @@ scenarios.global.with.targets <- scenarios %>%
     emulator_emissions %>% rename(target=scenario, target.value=value) %>% select(-model)
   )
 ```
+
 ### Per model
+
 ```{r}
 library("officer")
 ppt <- read_pptx()
@@ -802,19 +809,17 @@ print(ppt, target = here("data", "data_vetting", "figures", "per-model", "compar
 
 ```
 
-
 ### Per target
+
 ```{r}
 
 
 ```
 
-
-
-
 # Create some temperature plots
 
 ### All scenario targets, all models, all facets
+
 ```{r}
 # library(geomtextpath)
 
@@ -892,8 +897,6 @@ save_ggplot(
 
 ```
 
-
-
 # Check aggregation: total of IAMs still total of harmonization sector
 
 ```{r}
@@ -902,11 +905,10 @@ save_ggplot(
 
 ```
 
-
 # AR6-infilled vs CEDS2024_release
 
-
 ### Data: only global data
+
 ```{r}
 
 hist.total.global <- hist.national %>% filter(region=="World") %>% filter_includes("Total") %>% 
@@ -930,6 +932,7 @@ scenario.submitted.total.global <- ar6like.infilled.emissions %>% filter(region=
 ### Analysis: plot
 
 ##### Timeseries for all models (CO2)
+
 ```{r}
 
 
@@ -1056,8 +1059,8 @@ p.trajectory.co2.modelsubmitted.gcam
 
 ```
 
-
 ### Analysis: difference CO2 in 2020
+
 ```{r}
 
 co2.diff <- ar6.infilled.total.global %>% 
@@ -1080,14 +1083,15 @@ p.diff.2020.by.model
 ### Analysis: CO2 cumulative
 
 ##### Missing variables in the Scenario Explorer
+
 ```{r}
 # tbd
 ```
 
-
 ### Analysis: Harmonization differences
 
 ##### Data
+
 ```{r}
 
 harm.folder <- here(IAM_SCENARIOS_LOCATION, "harmonization_experiments", "the_hague")
@@ -1109,7 +1113,9 @@ harm.exps <- harm.def %>%
   mutate(Type = "Harmonized")
 
 ```
+
 ##### Visualise: example
+
 ```{r}
 
 p.harm.example <- ggplot(
@@ -1148,6 +1154,7 @@ save_ggplot(
 ```
 
 ##### Visualise: net-zero CO2
+
 ```{r}
 # method
 #' Estimate the Year When a Value Crosses Zero
@@ -1306,10 +1313,10 @@ save_ggplot(
 
 ```
 
-
 ### Analysis: F-Gases
 
 ##### Visuals
+
 ```{r}
 
 # make: 
@@ -1343,13 +1350,16 @@ p.fgases
 ```
 
 ##### Checking aggregation
+
 ```{r}
 
 
 ```
 
 ### Analysis: net-zero GHG climate
+
 ##### Checking aggregation
+
 ```{r}
 nzGHG.variable <- "AR6 climate diagnostics|Infilled|Emissions|Kyoto Gases (AR6-GWP100)"
 
@@ -1425,13 +1435,10 @@ p.deltaT.nzGHG
 
 ```
 
-
-
-
-
 # Other
 
-### Land use 
+### Land use
+
 ```{r}
 
 scenarios.alldata <- load_csv_iamc(file.path(IAM_SCENARIOS_LOCATION, IAM_SCENARIOS_FILE), mode="fast")
@@ -1520,8 +1527,8 @@ secenarios.land <- scenarios.alldata %>% filter(grepl(Variable, pattern="Land", 
 
 ```
 
-
 ##### CH4 AFOLU
+
 ```{r}
 ch4afolu <- scenarios %>% filter(region=="World") %>% add_scenariomip_targets_to_IAM_scenarios() %>% filter(target=="VLLO") %>% filter(variable=="Emissions|CH4|AFOLU")
 
@@ -1556,10 +1563,10 @@ p.ch4afolu.normalised
 
 ```
 
-
-### Vetting criteria 
+### Vetting criteria
 
 ##### Primary Energy Biomass
+
 ```{r}
 
 scenarios.biomass.global <- load_csv_iamc(file.path(IAM_SCENARIOS_LOCATION, IAM_SCENARIOS_FILE), mode="fast") %>% 
@@ -1616,7 +1623,6 @@ save_ggplot(
     )
 
 ```
-
 
 ### Some quick calculations for JUSTMIP (CO2 budget)
 
