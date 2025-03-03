@@ -5,7 +5,7 @@ if (!require("reticulate")) install.packages("reticulate")
 library(reticulate)
 # Import some R packages
 library(here)
-here::i_am("vetting_iam.Rproj")
+here::i_am("scenariomip.Rproj")
 source(here("R","utils.R"))
 library(vroom)
 library(tidyverse)
@@ -146,6 +146,15 @@ write_delim(
   file = here("data", paste0("scenarios_scenariomip_allmodels_", Sys.Date(),"-message.csv")),
   delim = ","
 )
+
+# FLOORSPACE MESSAGE
+floor_message <- scenarios_csv_message %>% filter(grepl(x=Variable, pattern="Floor Space", fixed=T))
+write_delim(
+  x = floor_message,
+  file = here("data", paste0("scenarios_floorspace_", Sys.Date(),"-message.csv")),
+  delim = ","
+)
+
 
 # Only MESSAGE ----
 
