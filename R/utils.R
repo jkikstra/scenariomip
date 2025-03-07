@@ -465,6 +465,14 @@ filter_wildcard_var <- function(df, variable.string,
 }
 
 
+remove_all_zero_values <- function(df){
+  return(
+    df %>%
+      filter(value != 0)
+  )
+}
+
+
 ##### Adjust IAMC column names: lower/upper case -------------------------------
 
 #' Capatilised first letter of IAMC columns to all lowercase
@@ -986,6 +994,16 @@ add_sector_and_species_columns <- function(df){
     )) %>%
     return()
 
+}
+
+remove_scenarios_with_issues <- function(df){
+  return(
+    df %>%
+      filter(!(scenario=="SSP2 - Medium Emissions_a" & model=="GCAM"), # reporting error; likely unit issue (at least in passenger transport pkm)
+             !(model=="MESSAGEix-GLOBIOM 2.1-M-R12"), # only keep MESSAGE model that has "GAINS" in the name
+             # !(scenario=="..." & model=="...")
+             )
+  )
 }
 
 ##### Adjusting "value" --------------------------------------------------------
@@ -1622,6 +1640,27 @@ plot_standard_line_one_region <- function(df, colour="scenario"){
   )
 
 }
+
+### String utils ---------------------------------------------------------------
+#' Clean a String by Removing Non-Alphanumeric Characters
+#'
+#' This function removes all non-alphanumeric characters (anything that is
+#' not a letter or a number) from the input string. Spaces, punctuation,
+#' and special characters are removed, leaving only letters and numbers.
+#'
+#' @param x A character string to be cleaned.
+#'
+#' @return A character string containing only letters and numbers.
+#'
+#' @examples
+#' clean_string("Hello World | R123!")  # Returns "HelloWorldR123"
+#' clean_string("Data-Science_2024!")  # Returns "DataScience2024"
+#'
+#' @export
+clean_string <- function(x) {
+  gsub("[^a-zA-Z0-9]", "", x)
+}
+
 
 ### Data manipulation ----------------------------------------------------------
 # The opposite of %in%, to be used in a dplyr::filter() call
