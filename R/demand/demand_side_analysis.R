@@ -95,6 +95,14 @@ plot.ssp.linetypes <- c(
 # ...
 # MESSAGE: keep the one with GAINS
 
+# Some units ----
+exa <- 1e18
+giga <- 1e9
+mega <- 1e6
+billion <- 1e9
+million <- 1e6
+pop.unit <- million # assume population is in millions.
+
 
 # Variable selection ----
 
@@ -104,11 +112,17 @@ vars.survey <- vroom(here("data", "demand", "Demand_Variable_Survey.csv"), skip 
 
 ## Misc
 vars.socioecon <- c("Population", "GDP|MER", "GDP|PPP")
+
 vars.fe <- c("Final Energy",
              "Final Energy|Industry",
              "Final Energy|Residential and Commercial",
              "Final Energy|Transportation",
-             "Final Energy|Non-Energy Use")
+             "Final Energy|Non-Energy Use",
+
+             "Final Energy|Electricity",
+             "Final Energy|Transportation|Electricity",
+             "Final Energy|Industry|Electricity",
+             "Final Energy|Residential and Commercial|Electricity")
 # to calculate:
 # share of electricity in final energy (per sector)
 
@@ -156,6 +170,9 @@ model.list.simple <- scenarios %>% distinct(model) %>% simplify_model_names() %>
 # Loading other data ----
 # ...
 
+# ... ... ... ... ... ... ... ... ... ------------------------------------------
+# DIRECT VARIABLES -------------------------------------------------------------
+# ... ... ... ... ... ... ... ... ... ------------------------------------------
 
 # totals (all direct variables) ----
 ## Global ----
@@ -182,7 +199,8 @@ for (v in vars.all){
       labs(
         y = y.unit,
         x = NULL,
-        title = v
+        title = v,
+        caption = paste0("File: ", IAM_SCENARIOS_FILE)
       ) +
       guides(colour = guide_legend(title = NULL),
              linetype = guide_legend(title = NULL))
@@ -226,7 +244,8 @@ for (v in vars.all){
       labs(
         y = y.unit,
         x = NULL,
-        title = v
+        title = v,
+        caption = paste0("File: ", IAM_SCENARIOS_FILE)
       ) +
       guides(colour = guide_legend(title = NULL),
              linetype = guide_legend(title = NULL))
@@ -245,87 +264,433 @@ for (v in vars.all){
 }
 
 
-
-## per capita (all direct variables) ----
-# TODO. Note: need to think about how to handle units. population in millions, while service is in different units.
-
-## Example figure: total over time ----
-p <- ggplot(scenarios %>% filter(region == "World",
-                                 variable == "Energy Service|Transportation|Passenger"),
-            aes(x = year, y = value,
-                group = interaction(full.model.name,scenario,region,variable,unit))) +
-  facet_wrap(~target, ncol = 3) +
-  mark_history() +
-  geom_line(
-    aes(colour = model,
-        linetype = ssp)
-  ) +
-  scale_color_manual(values = plot.model.colors) +
-  scale_linetype_manual(values = plot.ssp.linetypes) +
-  theme_jsk() +
-  labs(
-    y = "billion pkm/yr"
-  ) +
-  guides(colour = guide_legend(title = NULL),
-         linetype = guide_legend(title = NULL))
-p
-
-save_ggplot(
-  p = p,
-  h = 200,
-  w = 300,
-  f = file.path(path.figures, "transport_passenger_total")
-)
-## Example figure: per capita over time ----
-p <- ggplot(scenarios %>% filter(region == "World",
-                                 variable %in% c("Energy Service|Transportation|Passenger",
-                                                 "Population")) %>%
-              to_per_capita() %>% mutate(unit = "thousand pkm/yr per capita"),
-            aes(x = year, y = value * 1e3,
-                group = interaction(full.model.name,scenario,region,variable,unit))) +
-  facet_wrap(~target, ncol = 3) +
-  mark_history() +
-  geom_line(
-    aes(colour = model)
-  ) +
-  scale_color_manual(values = plot.model.colors) +
-  theme_jsk() +
-  labs(
-    y = "pkm/yr per capita"
-  ) +
-  guides(colour = guide_legend(title = NULL))
-p
-save_ggplot(
-  p = p,
-  h = 200,
-  w = 300,
-  f = file.path(path.figures, "transport_passenger_percap")
-)
+# ... ... ... ... ... ... ... ... ... ------------------------------------------
+# DIRECT VARIABLES (Per Capita) ------------------------------------------------
+# ... ... ... ... ... ... ... ... ... ------------------------------------------
 
 
-# Regional ----
-## Example figure: total over time ----
-p <- ggplot(scenarios %>% filter((region == "World" | grepl(region, pattern="R10", fixed=T)),
-                                 !(scenario=="SSP2 - Medium Emissions_a" & model=="GCAM"), # reporting error; likely unit issue
-                                 variable == "Energy Service|Transportation|Passenger"),
-            aes(x = year, y = value,
-                group = interaction(full.model.name,scenario,region,variable,unit))) +
-  facet_grid(region~target, scales="free_y") +
-  mark_history() +
-  geom_line(
-    aes(colour = model)
-  ) +
-  scale_color_manual(values = plot.model.colors) +
-  theme_jsk() +
-  labs(
-    y = "billion pkm/yr"
-  ) +
-  guides(colour = guide_legend(title = NULL))
-p
+to_per_capita_scenariomip <- function(df, y.u, p.u=pop.unit){
 
-save_ggplot(
-  p = p,
-  h = 200,
-  w = 300,
-  f = file.path(path.figures, "transport_passenger_total_regional")
-)
+  # formatting
+  df <- df %>%
+    rename(simple.model=model,model=full.model.name)
+
+  # to per capita
+  df <- df %>% to_per_capita() %>%
+    mutate(value = value / p.u)
+
+  # correct the units
+  if (y.u == "EJ/yr"){
+    df <- df %>%
+      mutate(value = value * exa / giga,
+             unit = "GJ/cap/yr")
+  } else if (y.u == "billion pkm/yr"){
+    df <- df %>%
+      mutate(value = value * billion,
+             unit = "pkm/cap/yr")
+  } else if (y.u == "billion tkm/yr"){
+    df <- df %>%
+      mutate(value = value * billion,
+             unit = "tkm/cap/yr")
+  } else if (y.u == "Mt/yr"){
+    df <- df %>%
+      mutate(value = value * mega,
+             unit = "t/cap/yr")
+  } else if (y.u == "bn m2"){ # change in common-definitions to 'billion m2'?
+    df <- df %>%
+      mutate(value = value * billion,
+             unit = "m2/cap")
+  } else if (y.u == "million"){
+    df <- df %>%
+      mutate(value = value * million,
+             unit = "unit/cap")
+  } else if (y.u == "°C-days"){ # change in common-definitions to '°C-days/yr' -> average per capita already?
+    df <- df %>%
+      mutate(value = value,
+             unit = "°C-days/cap/yr")
+  } else if (y.u == "billion USD_2010/yr"){
+    df <- df %>%
+      mutate(value = value * billion,
+             unit = "USD_2010/cap/yr")
+  } else {
+    print(paste0("The unit for variable ", v, " is not processed to per capita variables in this script."))
+    df <- df %>%
+      mutate(value = value,
+             unit = paste0(unit, " [per capita]") )
+  }
+
+  # formatting
+  df <- df %>%
+    rename(model=simple.model,full.model.name=model)
+
+  return(df)
+}
+
+
+## Global ----
+for (v in vars.all){
+  plot.data <- scenarios %>% filter(region == "World",
+                                    variable %in% c(v,
+                                                    "Population"))
+
+  # change to per capita units
+  if (nrow(plot.data%>%filter(variable!="Population"))>0){
+    y.unit <- plot.data %>% filter(variable!="Population") %>% pull(unit) %>% unique()
+
+    if(!is.na(y.unit)){
+      plot.data <- to_per_capita_scenariomip(df=plot.data, y.u=y.unit)
+    } else {
+      print("Unit error.")
+    }
+
+
+
+    # plot
+    if (nrow(plot.data%>%filter(variable!="Population"))>0){
+      print(paste0("Plotting ", v, " (per capita)"))
+
+      y.unit <- plot.data %>% pull(unit) %>% unique()
+      p <- ggplot(plot.data,
+                  aes(x = year, y = value,
+                      group = interaction(full.model.name,scenario,region,variable,unit))) +
+        facet_wrap(~target, ncol = 3) +
+        mark_history() +
+        geom_line(
+          aes(colour = model,
+              linetype = ssp)
+        ) +
+        scale_color_manual(values = plot.model.colors) +
+        scale_linetype_manual(values = plot.ssp.linetypes) +
+        theme_jsk() +
+        labs(
+          y = y.unit,
+          x = NULL,
+          title = v,
+          subtitle = "per capita",
+          caption = paste0("File: ", IAM_SCENARIOS_FILE)
+        ) +
+        guides(colour = guide_legend(title = NULL),
+               linetype = guide_legend(title = NULL))
+
+      save_ggplot(
+        p = p,
+        h = 200,
+        w = 300,
+        format = "png",
+        f = file.path(path.figures, paste0("world_percapita_", clean_string(v)))
+      )
+    } else {
+      print( paste0("Something went wrong in calculating per capita data for ", v) )
+    }
+
+
+  } else {
+    print( paste0("No data repoted for ", v) )
+  }
+
+
+
+}
+
+## R5 ----
+for (v in vars.all){
+  plot.data <- scenarios %>% filter((region == "World" | grepl(region, pattern=" (R5)", fixed=T)),
+                                    variable %in% c(v,
+                                                    "Population"))
+
+  # change to per capita units
+  if (nrow(plot.data%>%filter(variable!="Population"))>0){
+    y.unit <- plot.data %>% filter(variable!="Population") %>% pull(unit) %>% unique()
+
+    if(!is.na(y.unit)){
+      plot.data <- to_per_capita_scenariomip(df=plot.data, y.u=y.unit)
+    } else {
+      print("Unit error.")
+    }
+
+
+
+    # plot
+    if (nrow(plot.data%>%filter(variable!="Population"))>0){
+      print(paste0("Plotting ", v, " (per capita)"))
+
+      y.unit <- plot.data %>% pull(unit) %>% unique()
+      p <- ggplot(plot.data,
+                  aes(x = year, y = value,
+                      group = interaction(full.model.name,scenario,region,variable,unit))) +
+        facet_grid(region~target, scales="free_y") +
+        mark_history() +
+        geom_line(
+          aes(colour = model,
+              linetype = ssp)
+        ) +
+        scale_color_manual(values = plot.model.colors) +
+        scale_linetype_manual(values = plot.ssp.linetypes) +
+        theme_jsk() +
+        theme(
+          strip.text.y = element_text(angle = 0)
+        ) +
+        labs(
+          y = y.unit,
+          x = NULL,
+          title = v,
+          subtitle = "per capita",
+          caption = paste0("File: ", IAM_SCENARIOS_FILE)
+        ) +
+        guides(colour = guide_legend(title = NULL),
+               linetype = guide_legend(title = NULL))
+
+      save_ggplot(
+        p = p,
+        h = 200,
+        w = 300,
+        format = "png",
+        f = file.path(path.figures, paste0("r5_percapita_", clean_string(v)))
+      )
+    } else {
+      print( paste0("Something went wrong in calculating per capita data for ", v) )
+    }
+
+
+  } else {
+    print( paste0("No data repoted for ", v) )
+  }
+
+
+
+}
+
+
+
+
+# ... ... ... ... ... ... ... ... ... ------------------------------------------
+# CALCULATED/DERIVED VARIABLES -------------------------------------------------
+# ... ... ... ... ... ... ... ... ... ------------------------------------------
+
+# Electrification ----
+calculate_electrification <- function(df){
+
+  df %>% filter(variable %in% c(
+    "Final Energy",
+    "Final Energy|Electricity",
+
+    "Final Energy|Transportation",
+    "Final Energy|Industry",
+    "Final Energy|Residential and Commercial",
+    "Final Energy|Transportation|Electricity",
+    "Final Energy|Industry|Electricity",
+    "Final Energy|Residential and Commercial|Electricity"
+  )) %>%
+    mutate(total.or.electricity = ifelse(
+      grepl(variable, pattern="Electricity", fixed=T),
+      "Electricity",
+      "Total")
+    ) %>%
+    remove_variable_lastlevel_match("Electricity") %>%
+    pivot_wider(names_from = total.or.electricity, values_from = value) %>%
+    mutate(`Electrification rate` = Electricity / Total * 100) %>%
+    mutate_cond(variable=="Final Energy", variable = "Final Energy|Total") %>%
+    remove_variable_firstlevel_match("Final Energy") %>%
+    mutate(variable = paste0("Electrification of Final Energy (", variable, ")"),
+           unit = "%") %>%
+    rename(value = `Electrification rate`) %>%
+
+    return()
+
+}
+
+scenarios.electrification <- scenarios %>% calculate_electrification()
+
+vars.electrification <- scenarios.electrification %>%
+  pull(variable) %>% unique()
+
+## Global ----
+for (v in vars.electrification){
+  plot.data <- scenarios.electrification %>% filter(region == "World",
+                                    variable == v)
+
+  if (nrow(plot.data)>0){
+    print(paste0("Plotting ", v))
+
+    y.unit <- plot.data %>% pull(unit) %>% unique()
+    p <- ggplot(plot.data,
+                aes(x = year, y = value,
+                    group = interaction(full.model.name,scenario,region,variable,unit))) +
+      facet_wrap(~target, ncol = 3) +
+      mark_history() +
+      geom_line(
+        aes(colour = model,
+            linetype = ssp)
+      ) +
+      scale_color_manual(values = plot.model.colors) +
+      scale_linetype_manual(values = plot.ssp.linetypes) +
+      theme_jsk() +
+      labs(
+        y = y.unit,
+        x = NULL,
+        title = v,
+        caption = paste0("File: ", IAM_SCENARIOS_FILE)
+      ) +
+      guides(colour = guide_legend(title = NULL),
+             linetype = guide_legend(title = NULL))
+
+    save_ggplot(
+      p = p,
+      h = 200,
+      w = 300,
+      format = "png",
+      f = file.path(path.figures, paste0("world_electrification_", clean_string(v)))
+    )
+  } else {
+    print( paste0("No data repoted for ", v) )
+  }
+
+}
+## R5 ----
+for (v in vars.electrification){
+  plot.data <- scenarios.electrification %>% filter((region == "World" | grepl(region, pattern=" (R5)", fixed=T)),
+                                    variable == v)
+
+  if (nrow(plot.data)>0){
+    print(paste0("Plotting ", v))
+
+    y.unit <- plot.data %>% pull(unit) %>% unique()
+    p <- ggplot(plot.data,
+                aes(x = year, y = value,
+                    group = interaction(full.model.name,scenario,region,variable,unit))) +
+      facet_grid(region~target, scales="free_y") +
+      mark_history() +
+      geom_line(
+        aes(colour = model,
+            linetype = ssp)
+      ) +
+      scale_color_manual(values = plot.model.colors) +
+      scale_linetype_manual(values = plot.ssp.linetypes) +
+      theme_jsk() +
+      theme(
+        strip.text.y = element_text(angle = 0)
+      ) +
+      labs(
+        y = y.unit,
+        x = NULL,
+        title = v,
+        caption = paste0("File: ", IAM_SCENARIOS_FILE)
+      ) +
+      guides(colour = guide_legend(title = NULL),
+             linetype = guide_legend(title = NULL))
+
+    save_ggplot(
+      p = p,
+      h = 200,
+      w = 300,
+      format = "png",
+      f = file.path(path.figures, paste0("r5_electrification_", clean_string(v)))
+    )
+  } else {
+    print( paste0("No data repoted for ", v) )
+  }
+
+}
+
+
+
+# Per GDP on x-axis [per/cap service over per/cap GDP]   ----
+# ... use `to_per_gdp()`
+# example: pkm/$
+gdp.unit <- billion
+
+## R5 ----
+plot.data.gdp.percap <- scenarios %>%
+  filter((region == "World" | grepl(region, pattern=" (R5)", fixed=T)),
+         variable %in% c("Population",
+                         "GDP|PPP" # note; also possible to use GDP|MER
+                         )) %>%
+  to_per_capita_scenariomip(y.u="billion USD_2010/yr")
+gdp.percap.unit <- plot.data.gdp.percap %>% pull(unit) %>% unique()
+
+for (v in c("Energy Service|Residential|Floor Space",
+            "Energy Service|Transportation|Freight",
+            "Energy Service|Transportation|Passenger",
+            "Stocks|Transportation|Light-Duty Vehicle",
+            "Stocks|Transportation|Light-Duty Vehicle|Battery-Electric",
+            vars.electrification)){
+  plot.data <- scenarios %>% bind_rows(scenarios.electrification %>% select(-c(Total,Electricity))) %>% filter((region == "World" | grepl(region, pattern=" (R5)", fixed=T)),
+                                    variable %in% c(v,
+                                                    "Population"
+                                                    ))
+
+
+  # change to per capita units
+  if (nrow(plot.data%>%filter(variable!="Population"))>0){
+    y.unit <- plot.data %>% filter(variable!="Population") %>% pull(unit) %>% unique()
+
+    if (v %nin% vars.electrification){
+      if(!is.na(y.unit)){
+        plot.data <- to_per_capita_scenariomip(df=plot.data, y.u=y.unit)
+      } else {
+        print("Unit error.")
+      }
+    }
+    y.unit.percapita <- plot.data %>% filter(variable!="Population") %>% pull(unit) %>% unique()
+
+    plot.data <- plot.data %>%
+      bind_rows(plot.data.gdp.percap) %>%
+      select(-unit) %>%
+      pivot_wider(names_from = variable, values_from = value)
+
+
+
+    # plot
+    if (nrow(plot.data)>0){
+      print(paste0("Plotting ", v, " (over GDP/cap)"))
+
+      p <- ggplot(plot.data,
+                  aes(x = `GDP|PPP`, y = .data[[v]],
+                      group = interaction(full.model.name,scenario,region))) +
+        facet_grid(region~target, scales="free_y") +
+        geom_line(
+          aes(colour = model,
+              linetype = ssp)
+        ) +
+        scale_color_manual(values = plot.model.colors) +
+        scale_linetype_manual(values = plot.ssp.linetypes) +
+        theme_jsk() +
+        theme(
+          strip.text.y = element_text(angle = 0)
+        ) +
+        labs(
+          y = y.unit.percapita,
+          x = gdp.percap.unit,
+          title = v,
+          subtitle = "per capita",
+          caption = paste0("File: ", IAM_SCENARIOS_FILE)
+        ) +
+        guides(colour = guide_legend(title = NULL),
+               linetype = guide_legend(title = NULL))
+
+      save_ggplot(
+        p = p,
+        h = 200,
+        w = 300,
+        format = "png",
+        f = file.path(path.figures, paste0("r5_overgdp_", clean_string(v)))
+      )
+    } else {
+      print( paste0("Something went wrong in calculating per capita data for ", v) )
+    }
+
+
+  } else {
+    print( paste0("No data repoted for ", v) )
+  }
+
+
+
+}
+
+
+
+
+# Normalised to 2025 ---
+# ... use `normalise_iamc_long(starting.year = STARTYEAR)`
+

@@ -1302,7 +1302,7 @@ remove_variable_firstlevel_match <- function(df, match.string) {
   # Replace the matching pattern at the start of the string
   df %>%
     mutate(
-      variable = str_replace(variable, paste0("^", match.string), "")
+      variable = str_replace(variable, paste0("^", match.string, "\\|"), "")
     )
 }
 
@@ -1322,7 +1322,7 @@ remove_variable_lastlevel_match <- function(df, match.string) {
   # Replace the matching pattern at the end of the string
   df %>%
     mutate(
-      variable = str_replace(variable, paste0(match.string, "$"), "")
+      variable = str_replace(variable, paste0("\\|", match.string, "$"), "")
     )
 }
 
