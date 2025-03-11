@@ -137,12 +137,12 @@ vars.all <- c(
 
 
 # Loading IAM data ----
-# IAM_SCENARIOS_LOCATION <- here("data", "data_vetting", "scens")
-IAM_SCENARIOS_LOCATION <- "C:/Users/zaini/OneDrive - IIASA/Documents/ScenarioMIP demand"
+IAM_SCENARIOS_LOCATION <- here("data", "data_vetting", "scens")
+# IAM_SCENARIOS_LOCATION <- "C:/Users/zaini/OneDrive - IIASA/Documents/ScenarioMIP demand"
 
 # IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-02-17.csv"
 # IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-03-05.csv" # version 'demand_world_r5_total_directvariables_v20250307_a.zip'
-IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-03-11.csv" # version 'x.zip'
+IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-03-11.csv" # version presented in ScenarioMIP demand-side meeting on 13.03.2025
 
 scenarios.alldata <- load_csv_iamc(file.path(IAM_SCENARIOS_LOCATION, IAM_SCENARIOS_FILE), mode="fast")
 
@@ -170,8 +170,6 @@ scenarios <- scenarios %>%
 model.list <- scenarios %>% pull(model) %>% unique()
 model.list.simple <- scenarios %>% distinct(model) %>% simplify_model_names() %>% pull(model) %>% unique()
 
-# Keep only MESSAGE version with GAINS
-scenarios <- scenarios %>% filter(full.model.name != "MESSAGEix-GLOBIOM 2.1-M-R12")
 
 # Loading other data ----
 # ...
