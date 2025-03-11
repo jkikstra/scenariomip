@@ -68,6 +68,9 @@ source(here("R","utils.R"))
 # Where to save the figures? ----
 
 path.figures <- here("figures", "demand")
+path.figures.data <- here("figures_data", "demand")
+
+if(!dir.exists(path.figures.data)) { dir.create(path.figures.data, recursive = TRUE) }
 
 # visualisation choices ----
 STARTYEAR <- 2025
@@ -135,11 +138,14 @@ vars.all <- c(
 
 
 # Loading IAM data ----
-IAM_SCENARIOS_LOCATION <- here("data", "data_vetting", "scens")
+# IAM_SCENARIOS_LOCATION <- here("data", "data_vetting", "scens")
+IAM_SCENARIOS_LOCATION <- "C:/Users/zaini/OneDrive - IIASA/Documents/ScenarioMIP demand"
+
 # IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-02-17.csv"
 IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-03-05.csv"
 
 scenarios.alldata <- load_csv_iamc(file.path(IAM_SCENARIOS_LOCATION, IAM_SCENARIOS_FILE), mode="fast")
+
 
 # only keep relevant variables
 scenarios <- scenarios.alldata %>%
@@ -165,7 +171,8 @@ scenarios <- scenarios %>%
 model.list <- scenarios %>% pull(model) %>% unique()
 model.list.simple <- scenarios %>% distinct(model) %>% simplify_model_names() %>% pull(model) %>% unique()
 
-
+# Keep only MESSAGE version with GAINS
+scenarios <- scenarios %>% filter(full.model.name != "MESSAGEix-GLOBIOM 2.1-M-R12")
 
 # Loading other data ----
 # ...
@@ -693,4 +700,929 @@ for (v in c("Energy Service|Residential|Floor Space",
 
 # Normalised to 2025 ---
 # ... use `normalise_iamc_long(starting.year = STARTYEAR)`
+
+
+
+
+
+# Final energy per unit of service (GJ/m2, or GJ/pkm) [per/cap service over per/cap GDP]   ----
+
+
+to_per_unit_service_scenariomip <- function(df, var.service){
+
+  # formatting
+  df <- df %>%
+    rename(simple.model=model,model=full.model.name)
+
+  # Extract current unit of service (e.g. "bn m2")
+  service.unit <- df %>% filter(variable==var.service) %>% pull(unit) %>% unique()
+
+  # Correct the unit of the service, e.g. bn m2 to m2
+  if(service.unit == "bn m2") {
+    df <- df %>%
+      mutate(value = if_else(variable == var.service, value * billion, value))  %>%
+      mutate(unit = if_else(variable == var.service, "m2", unit))
+  } else if(service.unit == "billion pkm/yr") {
+    df <- df %>%
+      mutate(value = if_else(variable == var.service, value * billion, value))  %>%
+      mutate(unit = if_else(variable == var.service, "pkm/yr", unit))
+  } else if(service.unit == "billion tkm/yr") {
+    df <- df %>%
+      mutate(value = if_else(variable == var.service, value * billion, value))  %>%
+      mutate(unit = if_else(variable == var.service, "tkm/yr", unit))
+  } else if(service.unit == "Mt/yr") {
+    df <- df %>%
+      mutate(value = if_else(variable == var.service, value * mega, value))  %>%
+      mutate(unit = if_else(variable == var.service, "t/yr", unit))
+  }
+
+  formatted.service.unit <- df %>% filter(variable==var.service) %>% pull(unit) %>% unique()
+
+  df.service <- df %>% filter(variable==var.service) %>% rename(service.value=value) %>% select(model,scenario,region,year,service.value)
+
+  # Calculate variable per unit of service
+  df <- df %>% filter(variable!=var.service) %>%
+    left_join(df.service) %>%
+    mutate(value=value/service.value) %>%
+    mutate(unit=paste0(unit,"/",formatted.service.unit)) %>%
+    select(-service.value)
+
+  unit.per.service <- unique(df$unit)
+
+
+  # correct the units
+  if (unit.per.service == "EJ/yr/m2"){
+    df <- df %>%
+      mutate(value = value * exa / giga,
+             unit = "GJ/yr/m2")
+  } else if (unit.per.service == "EJ/yr/pkm/yr"){
+    df <- df %>%
+      mutate(value = value * exa / giga,
+             unit = "GJ/pkm")
+  } else if (unit.per.service == "EJ/yr/tkm/yr"){
+    df <- df %>%
+      mutate(value = value * exa / giga,
+             unit = "GJ/tkm")
+  } else if (unit.per.service == "EJ/yr/t/yr"){
+    df <- df %>%
+      mutate(value = value * exa / giga,
+             unit = "GJ/t")
+  } else {
+    print(paste0("The unit for variable ", v, " is not processed to per capita variables in this script."))
+    df <- df %>%
+      mutate(value = value,
+             unit = paste0(unit, " [per unit service]") )
+  }
+
+  # formatting
+  df <- df %>%
+    rename(model=simple.model,full.model.name=model)
+
+  return(df)
+}
+
+
+#' Final Energy variables to be calculated per unit of service:
+#' "Final Energy|Residential and Commercial",
+#' "Final Energy|Residential and Commercial|Electricity",
+#' "Final Energy|Transportation",
+#' "Final Energy|Industry"
+#'
+#' Energy service variables:
+#' Main ones:
+#' "Energy Service|Residential and Commercial|Floor Space"
+#' "Energy Service|Transportation|Passenger"
+#' "Energy Service|Transportation|Freight"
+#'
+#' "Production|Iron and Steel" (= "Production|Iron and Steel|Iron" + "Production|Iron and Steel|Steel")
+#' "Production|Non-Metallic Minerals|Cement"
+#'
+#' Others:
+#' "Energy Service|Residential|Floor Space"
+#' "Energy Service|Commercial|Floor Space"
+#'
+#' Others, probably not used:
+#' "Energy Service|Residential|Cooling Degree Days"
+#' "Energy Service|Residential|Heating Degree Days"
+#' "Energy Service|Transportation|Freight"
+#' "Energy Service|Transportation|Freight|Truck"
+#' "Energy Service|Transportation|Freight|Truck|Battery-Electric"
+#' "Energy Service|Transportation|Freight|Truck|Fuel-Cell-Electric"
+#' "Energy Service|Transportation|Freight|Truck|Internal Combustion"
+#' "Energy Service|Transportation|Freight|Truck|Plug-in Hybrid"
+#' "Energy Service|Transportation|Passenger|Active Transport [Share]"
+#' "Energy Service|Transportation|Passenger|Public Transport [Share]"
+#' "Energy Service|Transportation|Passenger|Road"
+#' "Energy Service|Transportation|Passenger|Road|Light-Duty Vehicle"
+
+
+
+
+  # Create a new dataframe with the summed values per group
+  iron_and_steel <- scenarios %>%
+  group_by(model, scenario, region, year, target, ssp, full.model.name) %>%
+  summarise(value = sum(value[variable %in% c("Production|Iron and Steel|Iron",
+                                              "Production|Iron and Steel|Steel")],
+                        na.rm = TRUE)) %>%
+  mutate(variable = "Production|Iron and Steel") %>%
+  mutate(unit = "Mt/yr") %>%
+  ungroup()
+
+# Bind the new rows back to the original dataframe
+  scenarios.with.aggregations <- bind_rows(scenarios, iron_and_steel)
+
+  ## choose variable to be calculated per unit of service: ----
+
+  v = "Final Energy|Industry"
+  v.service = "Production|Non-Metallic Minerals|Cement"
+
+  #' Final Energy variables to be calculated per unit of service:
+  #' "Final Energy|Residential and Commercial",
+  #' "Final Energy|Residential and Commercial|Electricity",
+  #' "Final Energy|Transportation",
+  #' "Final Energy|Industry"
+  #'
+  #' Energy service variables:
+  #' Main ones:
+  #' "Energy Service|Residential and Commercial|Floor Space"
+  #' "Energy Service|Transportation|Passenger"
+  #' "Energy Service|Transportation|Freight"
+  #'
+  #' "Production|Iron and Steel" (= "Production|Iron and Steel|Iron" + "Production|Iron and Steel|Steel")
+  #' "Production|Non-Metallic Minerals|Cement"
+
+## a) vs time ----
+
+### Global ----
+# for (v in vars.fe.per.service){
+
+# Clean service name:
+name.service <- v.service %>%
+  gsub("Energy Service\\|", "", .) %>%
+  gsub("Residential and Commercial\\|", "", .) %>%
+  gsub("Transportation\\|", "", .) %>%
+  gsub("Non-Metallic Minerals\\|", "", .)
+
+  plot.data <- scenarios.with.aggregations %>% filter(region == "World",
+                                    variable %in% c(v,
+                                                    v.service))
+
+  # change to per service units (m2 or pkm)
+  if (nrow(plot.data%>%filter(variable!=v.service))>0){  # only if you have data for variable v...
+
+    y.unit <- plot.data %>% filter(variable!=v.service) %>% pull(unit) %>% unique()
+    service.unit <- plot.data %>% filter(variable!=v) %>% pull(unit) %>% unique()
+
+    if(!is.na(y.unit)){
+      plot.data <- to_per_unit_service_scenariomip(df=plot.data, var.service=v.service)
+    } else {
+      print("Unit error.")
+    }
+
+
+
+    # plot
+    if (nrow(plot.data%>%filter(variable!=v.service))>0){ # again, only if you have data for variable v...
+
+      print(paste0("Plotting ", v, " per unit of ", v.service))
+
+      y.unit <- plot.data %>% pull(unit) %>% unique()
+      p <- ggplot(plot.data,
+                  aes(x = year, y = value,
+                      group = interaction(full.model.name,scenario,region,variable,unit))) +
+        facet_wrap(~target, ncol = 3) +
+        mark_history() +
+        geom_line(
+          aes(colour = model,
+              linetype = ssp)
+        ) +
+        scale_color_manual(values = plot.model.colors) +
+        scale_linetype_manual(values = plot.ssp.linetypes) +
+        theme_jsk() +
+        labs(
+          y = y.unit,
+          x = NULL,
+          title = v,
+          subtitle = paste0("per unit of service (", name.service,")"),
+          caption = paste0("File: ", IAM_SCENARIOS_FILE)
+        ) +
+        guides(colour = guide_legend(title = NULL),
+               linetype = guide_legend(title = NULL))
+
+      save_ggplot(
+        p = p,
+        h = 200,
+        w = 300,
+        format = "png",
+        f = file.path(path.figures, paste0("world_perservice_", clean_string(v), "_", clean_string(name.service)))
+      )
+
+      write_csv(plot.data, file.path(path.figures.data, paste0("world_perservice_", clean_string(v), "_", clean_string(name.service),".csv")))
+
+    } else {
+      print( paste0("Something went wrong in calculating per unit of service data for ", v) )
+    }
+
+
+  } else {
+    print( paste0("No data reported for ", v) )
+  }
+
+# } # end of loop over vars.fe.per.service
+
+
+
+### R5 ----
+
+# for (v in vars.fe.perservice){
+
+  # Clean service name:
+  name.service <- v.service %>%
+    gsub("Energy Service\\|", "", .) %>%
+    gsub("Residential and Commercial\\|", "", .) %>%
+    gsub("Transportation\\|", "", .) %>%
+    gsub("Non-Metallic Minerals\\|", "", .)
+
+  plot.data <- scenarios.with.aggregations %>% filter((region == "World" | grepl(region, pattern=" (R5)", fixed=T)),
+                                    variable %in% c(v,
+                                                    v.service))
+
+  # change to per service units (m2 or pkm)
+  if (nrow(plot.data%>%filter(variable!=v.service))>0){  # only if you have data for variable v...
+
+    y.unit <- plot.data %>% filter(variable!=v.service) %>% pull(unit) %>% unique()
+    service.unit <- plot.data %>% filter(variable!=v) %>% pull(unit) %>% unique()
+
+    if(!is.na(y.unit)){
+      plot.data <- to_per_unit_service_scenariomip(df=plot.data, var.service=v.service)
+    } else {
+      print("Unit error.")
+    }
+
+
+
+    # plot
+    if (nrow(plot.data%>%filter(variable!=v.service))>0){ # again, only if you have data for variable v...
+
+      print(paste0("Plotting ", v, " per unit of ", v.service))
+
+      y.unit <- plot.data %>% pull(unit) %>% unique()
+      p <- ggplot(plot.data,
+                  aes(x = year, y = value,
+                      group = interaction(full.model.name,scenario,region,variable,unit))) +
+        facet_grid(region~target, scales="free_y") +
+        mark_history() +
+        geom_line(
+          aes(colour = model,
+              linetype = ssp)
+        ) +
+        scale_color_manual(values = plot.model.colors) +
+        scale_linetype_manual(values = plot.ssp.linetypes) +
+        theme_jsk() +
+        theme(
+          strip.text.y = element_text(angle = 0)
+        ) +
+        labs(
+          y = y.unit,
+          x = NULL,
+          title = v,
+          subtitle = paste0("per unit of service (", name.service,")"),
+          caption = paste0("File: ", IAM_SCENARIOS_FILE)
+        ) +
+        guides(colour = guide_legend(title = NULL),
+               linetype = guide_legend(title = NULL))
+
+      save_ggplot(
+        p = p,
+        h = 200,
+        w = 300,
+        format = "png",
+        f = file.path(path.figures, paste0("r5_perservice_", clean_string(v), "_", clean_string(name.service)))
+      )
+
+      write_csv(plot.data, file.path(path.figures.data, paste0("r5_perservice_", clean_string(v), "_", clean_string(name.service), ".csv")))
+
+    } else {
+      print( paste0("Something went wrong in calculating per capita data for ", v) )
+    }
+
+
+  } else {
+    print( paste0("No data repoted for ", v) )
+  }
+
+# } # end of loop over final energy variables
+
+
+
+
+
+
+
+
+## b) vs GDPpc ----
+
+
+  ### Global ----
+
+  plot.data.gdp.percap <- scenarios %>%
+    filter(region == "World",
+           variable %in% c("Population",
+                           "GDP|PPP" # note; also possible to use GDP|MER
+           )) %>%
+    to_per_capita_scenariomip(y.u="billion USD_2010/yr")
+  gdp.percap.unit <- plot.data.gdp.percap %>% pull(unit) %>% unique()
+
+
+  # Clean service name:
+  name.service <- v.service %>%
+    gsub("Energy Service\\|", "", .) %>%
+    gsub("Residential and Commercial\\|", "", .) %>%
+    gsub("Transportation\\|", "", .) %>%
+    gsub("Non-Metallic Minerals\\|", "", .)
+
+  plot.data <- scenarios.with.aggregations %>% filter(region == "World" ,
+                                                      variable %in% c(v,
+                                                                      v.service))
+
+
+  # change to per service units
+  if (nrow(plot.data%>%filter(variable!=v.service))>0){
+
+    y.unit <- plot.data %>% filter(variable!=v.service) %>% pull(unit) %>% unique()
+    service.unit <- plot.data %>% filter(variable!=v) %>% pull(unit) %>% unique()
+
+    if(!is.na(y.unit)){
+      plot.data <- to_per_unit_service_scenariomip(df=plot.data, var.service=v.service)
+    } else {
+      print("Unit error.")
+    }
+
+    y.unit <- plot.data %>% pull(unit) %>% unique()
+
+    plot.data <- plot.data %>%
+      bind_rows(plot.data.gdp.percap) %>%
+      select(-unit) %>%
+      pivot_wider(names_from = variable, values_from = value)
+
+
+    # plot
+    if (nrow(plot.data)>0){
+      print(paste0("Plotting ", v, " (over GDP/cap)"))
+
+      p <- ggplot(plot.data,
+                  aes(x = `GDP|PPP`, y = .data[[v]],
+                      group = interaction(full.model.name,scenario,region))) +
+        facet_wrap(~target, ncol = 3) +
+        geom_line(
+          aes(colour = model,
+              linetype = ssp)
+        ) +
+        scale_color_manual(values = plot.model.colors) +
+        scale_linetype_manual(values = plot.ssp.linetypes) +
+        theme_jsk() +
+        theme(
+          strip.text.y = element_text(angle = 0)
+        ) +
+        labs(
+          y = y.unit,
+          x = gdp.percap.unit,
+          title = v,
+          subtitle = paste0("per unit of service (", name.service,")"),
+          caption = paste0("File: ", IAM_SCENARIOS_FILE)
+        ) +
+        guides(colour = guide_legend(title = NULL),
+               linetype = guide_legend(title = NULL))
+
+      save_ggplot(
+        p = p,
+        h = 200,
+        w = 300,
+        format = "png",
+        f = file.path(path.figures, paste0("world_perservice_overgdp_", clean_string(v), "_", clean_string(name.service)))
+      )
+
+      write_csv(plot.data, file.path(path.figures.data, paste0("world_perservice_overgdp_", clean_string(v), "_", clean_string(name.service), ".csv")))
+
+    } else {
+      print( paste0("Something went wrong in calculating per capita data for ", v) )
+    }
+
+
+  } else {
+    print( paste0("No data repoted for ", v) )
+  }
+
+
+  ### R5 ----
+
+  plot.data.gdp.percap <- scenarios %>%
+    filter((region == "World" | grepl(region, pattern=" (R5)", fixed=T)),
+           variable %in% c("Population",
+                           "GDP|PPP" # note; also possible to use GDP|MER
+           )) %>%
+    to_per_capita_scenariomip(y.u="billion USD_2010/yr")
+  gdp.percap.unit <- plot.data.gdp.percap %>% pull(unit) %>% unique()
+
+
+  # Clean service name:
+  name.service <- v.service %>%
+    gsub("Energy Service\\|", "", .) %>%
+    gsub("Residential and Commercial\\|", "", .) %>%
+    gsub("Transportation\\|", "", .) %>%
+    gsub("Non-Metallic Minerals\\|", "", .)
+
+  plot.data <- scenarios.with.aggregations %>% filter((region == "World" | grepl(region, pattern=" (R5)", fixed=T)),
+                                                      variable %in% c(v,
+                                                                      v.service))
+
+
+  # change to per capita units
+  if (nrow(plot.data%>%filter(variable!=v.service))>0){
+
+    y.unit <- plot.data %>% filter(variable!=v.service) %>% pull(unit) %>% unique()
+    service.unit <- plot.data %>% filter(variable!=v) %>% pull(unit) %>% unique()
+
+    if(!is.na(y.unit)){
+      plot.data <- to_per_unit_service_scenariomip(df=plot.data, var.service=v.service)
+    } else {
+      print("Unit error.")
+    }
+
+    y.unit <- plot.data %>% pull(unit) %>% unique()
+
+    plot.data <- plot.data %>%
+      bind_rows(plot.data.gdp.percap) %>%
+      select(-unit) %>%
+      pivot_wider(names_from = variable, values_from = value)
+
+
+
+    # plot
+    if (nrow(plot.data)>0){
+      print(paste0("Plotting ", v, " (over GDP/cap)"))
+
+      p <- ggplot(plot.data,
+                  aes(x = `GDP|PPP`, y = .data[[v]],
+                      group = interaction(full.model.name,scenario,region))) +
+        facet_grid(region~target, scales="free_y") +
+        geom_line(
+          aes(colour = model,
+              linetype = ssp)
+        ) +
+        scale_color_manual(values = plot.model.colors) +
+        scale_linetype_manual(values = plot.ssp.linetypes) +
+        theme_jsk() +
+        theme(
+          strip.text.y = element_text(angle = 0)
+        ) +
+        labs(
+          y = y.unit,
+          x = gdp.percap.unit,
+          title = v,
+          subtitle = paste0("per unit of service (", name.service,")"),
+          caption = paste0("File: ", IAM_SCENARIOS_FILE)
+        ) +
+        guides(colour = guide_legend(title = NULL),
+               linetype = guide_legend(title = NULL))
+
+      save_ggplot(
+        p = p,
+        h = 200,
+        w = 300,
+        format = "png",
+        f = file.path(path.figures, paste0("r5_perservice_overgdp_", clean_string(v), "_", clean_string(name.service)))
+      )
+
+      write_csv(plot.data, file.path(path.figures.data, paste0("r5_perservice_overgdp_", clean_string(v), "_", clean_string(name.service), ".csv")))
+
+    } else {
+      print( paste0("Something went wrong in calculating per capita data for ", v) )
+    }
+
+
+  } else {
+    print( paste0("No data repoted for ", v) )
+  }
+
+
+
+
+
+
+# ---- Final Energy intensity per unit of GDP ----
+
+  path.figures.fe.intensity <- file.path(path.figures, "fe intensity")
+  path.figures.data.fe.intensity <- file.path(path.figures.data, "fe intensity")
+
+  if(!dir.exists(path.figures.data.fe.intensity)) {dir.create(path.figures.data.fe.intensity, recursive = TRUE)}
+
+  to_per_unit_gdp_scenariomip <- function(df){
+
+    # formatting
+    df <- df %>%
+      rename(simple.model=model,model=full.model.name)
+
+    # Extract current unit of service (e.g. "bn m2")
+    gdp.unit <- df %>% filter(variable=="GDP|PPP") %>% pull(unit) %>% unique()
+
+    # Correct the unit of the gdp
+    df <- df %>%
+      mutate(value = if_else(variable == "GDP|PPP", value * billion, value))  %>%
+      mutate(unit = if_else(variable == "GDP|PPP", "USD_2010/yr", unit))
+
+    formatted.gdp.unit <- df %>% filter(variable=="GDP|PPP") %>% pull(unit) %>% unique()
+
+    df.gdp <- df %>% filter(variable=="GDP|PPP") %>% rename(gdp.value=value) %>% select(model,scenario,region,year,gdp.value)
+
+    # Calculate variable per unit of service
+    df <- df %>% filter(variable!="GDP|PPP") %>%
+      left_join(df.gdp) %>%
+      mutate(value=value/gdp.value) %>%
+      mutate(unit=paste0(unit,"/",formatted.gdp.unit)) %>%
+      select(-gdp.value)
+
+    unit.per.gdp <- unique(df$unit)
+
+
+    # correct the units
+    if (unit.per.gdp == "EJ/yr/USD_2010/yr"){
+      df <- df %>%
+        mutate(value = value * exa / mega,
+               unit = "MJ/USD_2010")
+    } else {
+      print(paste0("The unit for variable ", v, " is not processed to per gdp variables in this script."))
+      df <- df %>%
+        mutate(value = value,
+               unit = paste0(unit, " [per unit service]") )
+    }
+
+    # formatting
+    df <- df %>%
+      rename(model=simple.model,full.model.name=model)
+
+    return(df)
+  }
+
+
+  ## choose variable to be calculated per unit of service: ----
+
+vars.fe.intensity <- c(
+  "Final Energy|Residential and Commercial",
+  "Final Energy|Residential and Commercial|Electricity",
+  "Final Energy|Transportation",
+  "Final Energy|Industry",
+  "Final Energy|Electricity"
+  )
+
+  #' Final Energy variables to be calculated per unit of service:
+  #' "Final Energy|Residential and Commercial",
+  #' "Final Energy|Residential and Commercial|Electricity",
+  #' "Final Energy|Transportation",
+  #' "Final Energy|Industry"
+  #'
+  #' Energy service variables:
+  #' Main ones:
+  #' "Energy Service|Residential and Commercial|Floor Space"
+  #' "Energy Service|Transportation|Passenger"
+  #' "Energy Service|Transportation|Freight"
+  #'
+  #' "Production|Iron and Steel" (= "Production|Iron and Steel|Iron" + "Production|Iron and Steel|Steel")
+  #' "Production|Non-Metallic Minerals|Cement"
+
+  v = "Final Energy|Residential and Commercial"
+  # v.service = "Production|Non-Metallic Minerals|Cement"
+
+  ## a) vs time ----
+
+  ### Global ----
+
+  for (v in vars.fe.intensity){
+
+  plot.data <- scenarios.with.aggregations %>% filter(region == "World",
+                                                      variable %in% c(v,
+                                                                      "GDP|PPP"))
+
+  # change to per service units (m2 or pkm)
+  if (nrow(plot.data%>%filter(variable!="GDP|PPP"))>0){  # only if you have data for variable v...
+
+    y.unit <- plot.data %>% filter(variable!="GDP|PPP") %>% pull(unit) %>% unique()
+    gdp.unit <- plot.data %>% filter(variable=="GDP|PPP") %>% pull(unit) %>% unique()
+
+    if(!is.na(y.unit)){
+      plot.data <- to_per_unit_gdp_scenariomip(df=plot.data)
+    } else {
+      print("Unit error.")
+    }
+
+
+
+    # plot
+    if (nrow(plot.data%>%filter(variable!="GDP|PPP"))>0){ # again, only if you have data for variable v...
+
+      print(paste0("Plotting ", v, " per unit of ", "GDP|PPP"))
+
+      y.unit <- plot.data %>% pull(unit) %>% unique()
+
+      p <- ggplot(plot.data,
+                  aes(x = year, y = value,
+                      group = interaction(full.model.name,scenario,region,variable,unit))) +
+        facet_wrap(~target, ncol = 3) +
+        mark_history() +
+        geom_line(
+          aes(colour = model,
+              linetype = ssp)
+        ) +
+        scale_color_manual(values = plot.model.colors) +
+        scale_linetype_manual(values = plot.ssp.linetypes) +
+        theme_jsk() +
+        labs(
+          y = y.unit,
+          x = NULL,
+          title = v,
+          subtitle = "per unit of GDP|PPP",
+          caption = paste0("File: ", IAM_SCENARIOS_FILE)
+        ) +
+        guides(colour = guide_legend(title = NULL),
+               linetype = guide_legend(title = NULL))
+
+      save_ggplot(
+        p = p,
+        h = 200,
+        w = 300,
+        format = "png",
+        f = file.path(path.figures.fe.intensity, paste0("world_intensity_pergdp_", clean_string(v)))
+      )
+
+      write_csv(plot.data, file.path(path.figures.data.fe.intensity, paste0("world_intensity_pergdp_", clean_string(v), ".csv")))
+
+    } else {
+      print( paste0("Something went wrong in calculating per unit of service data for ", v) )
+    }
+
+
+  } else {
+    print( paste0("No data reported for ", v) )
+  }
+
+  } # end of loop over vars.fe.intensity
+
+
+  ### R5 ----
+
+  for (v in vars.fe.intensity){
+
+    plot.data <- scenarios.with.aggregations %>% filter((region == "World" | grepl(region, pattern=" (R5)", fixed=T)),
+                                                        variable %in% c(v,
+                                                                        "GDP|PPP"))
+
+    # change to per service units (m2 or pkm)
+    if (nrow(plot.data%>%filter(variable!="GDP|PPP"))>0){  # only if you have data for variable v...
+
+      y.unit <- plot.data %>% filter(variable!="GDP|PPP") %>% pull(unit) %>% unique()
+      gdp.unit <- plot.data %>% filter(variable=="GDP|PPP") %>% pull(unit) %>% unique()
+
+      if(!is.na(y.unit)){
+        plot.data <- to_per_unit_gdp_scenariomip(df=plot.data)
+      } else {
+        print("Unit error.")
+      }
+
+
+
+      # plot
+      if (nrow(plot.data%>%filter(variable!="GDP|PPP"))>0){ # again, only if you have data for variable v...
+
+        print(paste0("Plotting ", v, " per unit of ", "GDP|PPP"))
+
+        y.unit <- plot.data %>% pull(unit) %>% unique()
+
+        p <- ggplot(plot.data,
+                    aes(x = year, y = value,
+                        group = interaction(full.model.name,scenario,region,variable,unit))) +
+          facet_grid(region~target, scales="free_y") +
+          mark_history() +
+          geom_line(
+            aes(colour = model,
+                linetype = ssp)
+          ) +
+          scale_color_manual(values = plot.model.colors) +
+          scale_linetype_manual(values = plot.ssp.linetypes) +
+          theme_jsk() +
+          labs(
+            y = y.unit,
+            x = NULL,
+            title = v,
+            subtitle = "per unit of GDP|PPP",
+            caption = paste0("File: ", IAM_SCENARIOS_FILE)
+          ) +
+          guides(colour = guide_legend(title = NULL),
+                 linetype = guide_legend(title = NULL))
+
+
+       save_ggplot(
+          p = p,
+          h = 200,
+          w = 300,
+          format = "png",
+          f = file.path(path.figures.fe.intensity, paste0("r5_intensity_pergdp_", clean_string(v)))
+        )
+
+        write_csv(plot.data, file.path(path.figures.data.fe.intensity, paste0("r5_intensity_pergdp_", clean_string(v), ".csv")))
+
+      } else {
+        print( paste0("Something went wrong in calculating per unit of service data for ", v) )
+      }
+
+
+    } else {
+      print( paste0("No data reported for ", v) )
+    }
+
+  } # end of loop over vars.fe.intensity
+
+
+
+
+  ## b) vs GDPpc ----
+
+
+  ### Global ----
+
+  plot.data.gdp.percap <- scenarios %>%
+    filter(region == "World",
+           variable %in% c("Population",
+                           "GDP|PPP" # note; also possible to use GDP|MER
+           )) %>%
+    to_per_capita_scenariomip(y.u="billion USD_2010/yr")
+  gdp.percap.unit <- plot.data.gdp.percap %>% pull(unit) %>% unique()
+
+
+  for (v in vars.fe.intensity){
+
+  plot.data <- scenarios.with.aggregations %>% filter(region == "World",
+                                                      variable %in% c(v,
+                                                                      "GDP|PPP"))
+
+  # change to per service units (m2 or pkm)
+  if (nrow(plot.data%>%filter(variable!="GDP|PPP"))>0){  # only if you have data for variable v...
+
+    y.unit <- plot.data %>% filter(variable!="GDP|PPP") %>% pull(unit) %>% unique()
+    gdp.unit <- plot.data %>% filter(variable=="GDP|PPP") %>% pull(unit) %>% unique()
+
+    if(!is.na(y.unit)){
+      plot.data <- to_per_unit_gdp_scenariomip(df=plot.data)
+    } else {
+      print("Unit error.")
+    }
+
+    y.unit <- plot.data %>% pull(unit) %>% unique()
+
+    plot.data <- plot.data %>%
+      bind_rows(plot.data.gdp.percap) %>%
+      select(-unit) %>%
+      pivot_wider(names_from = variable, values_from = value)
+
+
+
+    # plot
+    if (nrow(plot.data)>0){
+      print(paste0("Plotting ", v, " (over GDP/cap)"))
+
+      p <- ggplot(plot.data,
+                  aes(x = `GDP|PPP`, y = .data[[v]],
+                      group = interaction(full.model.name,scenario,region))) +
+        facet_wrap(~target, ncol = 3) +
+        geom_line(
+          aes(colour = model,
+              linetype = ssp)
+        ) +
+        scale_color_manual(values = plot.model.colors) +
+        scale_linetype_manual(values = plot.ssp.linetypes) +
+        theme_jsk() +
+        theme(
+          strip.text.y = element_text(angle = 0)
+        ) +
+        labs(
+          y = y.unit,
+          x = gdp.percap.unit,
+          title = v,
+          subtitle = paste0("per unit of GDP|PPP"),
+          caption = paste0("File: ", IAM_SCENARIOS_FILE)
+        ) +
+        guides(colour = guide_legend(title = NULL),
+               linetype = guide_legend(title = NULL))
+
+      save_ggplot(
+        p = p,
+        h = 200,
+        w = 300,
+        format = "png",
+        f = file.path(path.figures.fe.intensity, paste0("world_fe_pergdp_overgdp_", clean_string(v)))
+      )
+
+      write_csv(plot.data, file.path(path.figures.data.fe.intensity, paste0("world_fe_pergdp_overgdp_", clean_string(v), ".csv")))
+
+
+    } else {
+      print( paste0("Something went wrong in calculating per unit of service data for ", v) )
+    }
+
+
+  } else {
+    print( paste0("No data reported for ", v) )
+  }
+
+  } # end of loop over vars.fe.intensity
+
+
+
+
+  ### R5 ----
+
+  plot.data.gdp.percap <- scenarios %>%
+    filter((region == "World" | grepl(region, pattern=" (R5)", fixed=T)),
+           variable %in% c("Population",
+                           "GDP|PPP" # note; also possible to use GDP|MER
+           )) %>%
+    to_per_capita_scenariomip(y.u="billion USD_2010/yr")
+  gdp.percap.unit <- plot.data.gdp.percap %>% pull(unit) %>% unique()
+
+
+  for (v in vars.fe.intensity){
+
+    plot.data <- scenarios.with.aggregations %>% filter((region == "World" | grepl(region, pattern=" (R5)", fixed=T)),
+                                                        variable %in% c(v,
+                                                                        "GDP|PPP"))
+
+    # change to per service units (m2 or pkm)
+    if (nrow(plot.data%>%filter(variable!="GDP|PPP"))>0){  # only if you have data for variable v...
+
+      y.unit <- plot.data %>% filter(variable!="GDP|PPP") %>% pull(unit) %>% unique()
+      gdp.unit <- plot.data %>% filter(variable=="GDP|PPP") %>% pull(unit) %>% unique()
+
+      if(!is.na(y.unit)){
+        plot.data <- to_per_unit_gdp_scenariomip(df=plot.data)
+      } else {
+        print("Unit error.")
+      }
+
+      y.unit <- plot.data %>% pull(unit) %>% unique()
+
+      plot.data <- plot.data %>%
+        bind_rows(plot.data.gdp.percap) %>%
+        select(-unit) %>%
+        pivot_wider(names_from = variable, values_from = value)
+
+
+
+      # plot
+      if (nrow(plot.data)>0){
+        print(paste0("Plotting ", v, " (over GDP/cap)"))
+
+        p <- ggplot(plot.data,
+                    aes(x = `GDP|PPP`, y = .data[[v]],
+                        group = interaction(full.model.name,scenario,region))) +
+          facet_grid(region~target, scales="free_y") +
+          geom_line(
+            aes(colour = model,
+                linetype = ssp)
+          ) +
+          scale_color_manual(values = plot.model.colors) +
+          scale_linetype_manual(values = plot.ssp.linetypes) +
+          theme_jsk() +
+          theme(
+            strip.text.y = element_text(angle = 0)
+          ) +
+          labs(
+            y = y.unit,
+            x = gdp.percap.unit,
+            title = v,
+            subtitle = paste0("per unit of GDP|PPP"),
+            caption = paste0("File: ", IAM_SCENARIOS_FILE)
+          ) +
+          guides(colour = guide_legend(title = NULL),
+                 linetype = guide_legend(title = NULL))
+
+        save_ggplot(
+          p = p,
+          h = 200,
+          w = 300,
+          format = "png",
+          f = file.path(path.figures.fe.intensity, paste0("r5_fe_pergdp_overgdp_", clean_string(v)))
+        )
+
+        write_csv(plot.data, file.path(path.figures.data.fe.intensity, paste0("r5_fe_pergdp_overgdp_", clean_string(v), ".csv")))
+
+
+      } else {
+        print( paste0("Something went wrong in calculating per unit of service data for ", v) )
+      }
+
+
+    } else {
+      print( paste0("No data reported for ", v) )
+    }
+
+  } # end of loop over vars.fe.intensity
 
