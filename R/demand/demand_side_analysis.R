@@ -13,7 +13,6 @@ here::i_am("scenariomip.Rproj")
 
 source(here("R","utils.R"))
 
-
 # Notes ----
 # The list of variables is here: https://docs.google.com/spreadsheets/d/1H65lrzcBBBoUYKc4rjt1sJdbdLTf7YMRM-n2k325FDU/edit?usp=sharing
 # (not sure whether Tommaso has access already, or whether this is an open drive) This list was originally used to inquire with the teams whether they can extend their reporting, so this also gives an impression of what would be available from the models.
@@ -137,7 +136,8 @@ vars.all <- c(
 # Loading IAM data ----
 IAM_SCENARIOS_LOCATION <- here("data", "data_vetting", "scens")
 # IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-02-17.csv"
-IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-03-05.csv"
+# IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-03-05.csv" # version 'demand_world_r5_total_directvariables_v20250307_a.zip'
+IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-03-11.csv" # version 'x.zip'
 
 scenarios.alldata <- load_csv_iamc(file.path(IAM_SCENARIOS_LOCATION, IAM_SCENARIOS_FILE), mode="fast")
 
@@ -156,10 +156,9 @@ scenarios <- scenarios %>%
 scenarios <- scenarios %>%
   add_scenariomip_targets_to_IAM_scenarios() %>%
   add_ssp_basis_to_IAM_scenarios() %>%
+  remove_scenarios_with_issues() %>% # temporary fix (which should be reported to the modelling teams)
   simplify_model_names(keep.full.model.name = T) %>%
-  # temporary fixes (which should be reported to the modelling teams)
-  remove_scenarios_with_issues() %>%
-  remove_all_zero_values()
+  remove_all_zero_values() # temporary fix (which should be reported to the modelling teams)
 
 # save some useful lists
 model.list <- scenarios %>% pull(model) %>% unique()
@@ -179,6 +178,9 @@ model.list.simple <- scenarios %>% distinct(model) %>% simplify_model_names() %>
 for (v in vars.all){
   plot.data <- scenarios %>% filter(region == "World",
                                     variable == v)
+
+  # order data by scenarioMIP target scenario
+  plot.data$target <- factor(plot.data$target, levels=c('VLLO','VLHO','L','ML', 'M', 'H'))
 
   if (nrow(plot.data)>0){
     print(paste0("Plotting ", v))
@@ -221,6 +223,10 @@ for (v in vars.all){
 for (v in vars.all){
   plot.data <- scenarios %>% filter((region == "World" | grepl(region, pattern=" (R5)", fixed=T)),
                                     variable == v)
+
+  # order data by scenarioMIP target scenario
+  plot.data$target <- factor(plot.data$target, levels=c('VLLO','VLHO','L','ML', 'M', 'H'))
+
 
   if (nrow(plot.data)>0){
     print(paste0("Plotting ", v))
@@ -332,6 +338,8 @@ for (v in vars.all){
   plot.data <- scenarios %>% filter(region == "World",
                                     variable %in% c(v,
                                                     "Population"))
+  # order data by scenarioMIP target scenario
+  plot.data$target <- factor(plot.data$target, levels=c('VLLO','VLHO','L','ML', 'M', 'H'))
 
   # change to per capita units
   if (nrow(plot.data%>%filter(variable!="Population"))>0){
@@ -397,6 +405,10 @@ for (v in vars.all){
   plot.data <- scenarios %>% filter((region == "World" | grepl(region, pattern=" (R5)", fixed=T)),
                                     variable %in% c(v,
                                                     "Population"))
+
+  # order data by scenarioMIP target scenario
+  plot.data$target <- factor(plot.data$target, levels=c('VLLO','VLHO','L','ML', 'M', 'H'))
+
 
   # change to per capita units
   if (nrow(plot.data%>%filter(variable!="Population"))>0){
@@ -509,6 +521,10 @@ for (v in vars.electrification){
   plot.data <- scenarios.electrification %>% filter(region == "World",
                                     variable == v)
 
+  # order data by scenarioMIP target scenario
+  plot.data$target <- factor(plot.data$target, levels=c('VLLO','VLHO','L','ML', 'M', 'H'))
+
+
   if (nrow(plot.data)>0){
     print(paste0("Plotting ", v))
 
@@ -618,6 +634,10 @@ for (v in c("Energy Service|Residential|Floor Space",
                                     variable %in% c(v,
                                                     "Population"
                                                     ))
+
+  # order data by scenarioMIP target scenario
+  plot.data$target <- factor(plot.data$target, levels=c('VLLO','VLHO','L','ML', 'M', 'H'))
+
 
 
   # change to per capita units
