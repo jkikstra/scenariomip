@@ -8,6 +8,7 @@ library("ggsci")
 library("testthat")
 library("stringr")
 library("ggthemes")
+library("pals")
 
 here::i_am("scenariomip.Rproj")
 
@@ -90,8 +91,26 @@ plot.ssp.linetypes <- c(
   "SSP4" = "1111",
   "SSP5" = "3131"
 )
+
+plot.target.linetypes <- c(
+  "VLLO" = "solid",
+  "VLHO" = "3131",
+  "L" = "3333",
+  "ML" = "3313",
+  "M" = "1111",
+  "H" = "dotted"
+)
+
 # plot.ssp.shapes
 
+plot.region.colours <- c(
+  "red",
+  "magenta",
+  "green4",
+  "chocolate4",
+  "darkgrey",
+  "black"
+)
 
 # Helper functions ----
 # ...
@@ -137,8 +156,8 @@ vars.all <- c(
 
 
 # Loading IAM data ----
-IAM_SCENARIOS_LOCATION <- here("data", "data_vetting", "scens")
-# IAM_SCENARIOS_LOCATION <- "C:/Users/zaini/OneDrive - IIASA/Documents/ScenarioMIP demand"
+# IAM_SCENARIOS_LOCATION <- here("data", "data_vetting", "scens")
+IAM_SCENARIOS_LOCATION <- "C:/Users/zaini/OneDrive - IIASA/Documents/ScenarioMIP demand"
 
 # IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-02-17.csv"
 # IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-03-05.csv" # version 'demand_world_r5_total_directvariables_v20250307_a.zip'
@@ -162,8 +181,8 @@ scenarios <- scenarios %>%
 scenarios <- scenarios %>%
   add_scenariomip_targets_to_IAM_scenarios() %>%
   add_ssp_basis_to_IAM_scenarios() %>%
-  remove_scenarios_with_issues() %>% # temporary fix (which should be reported to the modelling teams)
   simplify_model_names(keep.full.model.name = T) %>%
+  remove_scenarios_with_issues() %>% # temporary fix (which should be reported to the modelling teams)
   remove_all_zero_values() # temporary fix (which should be reported to the modelling teams)
 
 # save some useful lists
@@ -179,6 +198,12 @@ model.list.simple <- scenarios %>% distinct(model) %>% simplify_model_names() %>
 # ... ... ... ... ... ... ... ... ... ------------------------------------------
 
 # totals (all direct variables) ----
+
+path.figures.activity.total <- file.path(path.figures, "activity total")
+path.figures.data.activity.total <- file.path(path.figures.data, "activity total")
+
+if(!dir.exists(path.figures.data.activity.total)) {dir.create(path.figures.data.activity.total, recursive = TRUE)}
+
 ## Global ----
 for (v in vars.all){
   plot.data <- scenarios %>% filter(region == "World",
@@ -217,8 +242,11 @@ for (v in vars.all){
       h = 200,
       w = 300,
       format = "png",
-      f = file.path(path.figures, paste0("world_total_", clean_string(v)))
+      f = file.path(path.figures.activity.total, paste0("world_total_", clean_string(v)))
     )
+
+    write_csv(plot.data, file.path(path.figures.data.activity.total, paste0("world_total_", clean_string(v), ".csv")))
+
   } else {
     print( paste0("No data repoted for ", v) )
   }
@@ -229,8 +257,9 @@ for (v in vars.all){
   plot.data <- scenarios %>% filter((region == "World" | grepl(region, pattern=" (R5)", fixed=T)),
                                     variable == v)
 
-  # order data by scenarioMIP target scenario
+  # order data by scenarioMIP target scenario and by region
   plot.data$target <- factor(plot.data$target, levels=c('VLLO','VLHO','L','ML', 'M', 'H'))
+  plot.data$region <- factor(plot.data$region, levels = c("Middle East & Africa (R5)", "Latin America (R5)", "Asia (R5)", "Reforming Economies (R5)", "OECD & EU (R5)", "World"))
 
 
   if (nrow(plot.data)>0){
@@ -266,8 +295,11 @@ for (v in vars.all){
       h = 200,
       w = 300,
       format = "png",
-      f = file.path(path.figures, paste0("r5_total_", clean_string(v)))
+      f = file.path(path.figures.activity.total, paste0("r5_total_", clean_string(v)))
     )
+
+    write_csv(plot.data, file.path(path.figures.data.activity.total, paste0("r5_total_", clean_string(v), ".csv")))
+
   } else {
     print( paste0("No data repoted for ", v) )
   }
@@ -278,6 +310,12 @@ for (v in vars.all){
 # ... ... ... ... ... ... ... ... ... ------------------------------------------
 # DIRECT VARIABLES (Per Capita) ------------------------------------------------
 # ... ... ... ... ... ... ... ... ... ------------------------------------------
+
+# Create subfolders where to save plots and data
+path.figures.activity.percap <- file.path(path.figures, "activity per cap")
+path.figures.data.activity.percap <- file.path(path.figures.data, "activity per cap")
+
+if(!dir.exists(path.figures.data.activity.percap)) {dir.create(path.figures.data.activity.percap, recursive = TRUE)}
 
 
 to_per_capita_scenariomip <- function(df, y.u, p.u=pop.unit){
@@ -390,8 +428,11 @@ for (v in vars.all){
         h = 200,
         w = 300,
         format = "png",
-        f = file.path(path.figures, paste0("world_percapita_", clean_string(v)))
+        f = file.path(path.figures.activity.percap, paste0("world_percapita_", clean_string(v)))
       )
+
+      write_csv(plot.data, file.path(path.figures.data.activity.percap, paste0("world_percapita_", clean_string(v), ".csv")))
+
     } else {
       print( paste0("Something went wrong in calculating per capita data for ", v) )
     }
@@ -411,8 +452,6 @@ for (v in vars.all){
                                     variable %in% c(v,
                                                     "Population"))
 
-  # order data by scenarioMIP target scenario
-  plot.data$target <- factor(plot.data$target, levels=c('VLLO','VLHO','L','ML', 'M', 'H'))
 
 
   # change to per capita units
@@ -425,7 +464,9 @@ for (v in vars.all){
       print("Unit error.")
     }
 
-
+    # order data by scenarioMIP target scenario and by region
+    plot.data$target <- factor(plot.data$target, levels=c('VLLO','VLHO','L','ML', 'M', 'H'))
+    plot.data$region <- factor(plot.data$region, levels = c("Middle East & Africa (R5)", "Latin America (R5)", "Asia (R5)", "Reforming Economies (R5)", "OECD & EU (R5)", "World"))
 
     # plot
     if (nrow(plot.data%>%filter(variable!="Population"))>0){
@@ -462,8 +503,85 @@ for (v in vars.all){
         h = 200,
         w = 300,
         format = "png",
-        f = file.path(path.figures, paste0("r5_percapita_", clean_string(v)))
+        f = file.path(path.figures.activity.percap, paste0("r5_percapita_", clean_string(v)))
       )
+
+      write_csv(plot.data, file.path(path.figures.data.activity.percap, paste0("r5_percapita_", clean_string(v), ".csv")))
+
+
+      # Remove models with no data
+      plot.data <- plot.data %>% drop_na(value)
+
+      p.convergence <- ggplot(plot.data,
+                              aes(x = year, y = value,
+                                  group = interaction(full.model.name,scenario,region,variable,unit))) +
+        facet_grid(model~target, scales="free_y") +
+        mark_history() +
+        geom_line(
+          aes(colour = region,
+              linetype = ssp)
+        ) +
+        scale_color_manual(values = plot.region.colours) +
+        scale_linetype_manual(values = plot.ssp.linetypes) +
+        theme_jsk() +
+        theme(
+          strip.text.y = element_text(angle = 0)
+        ) +
+        labs(
+          y = y.unit,
+          x = NULL,
+          title = v,
+          subtitle = "per capita",
+          caption = paste0("File: ", IAM_SCENARIOS_FILE)
+        ) +
+        guides(colour = guide_legend(title = NULL),
+               linetype = guide_legend(title = NULL))
+
+      p.convergence
+
+      save_ggplot(
+        p = p.convergence,
+        h = 200,
+        w = 300,
+        format = "png",
+        f = file.path(path.figures.activity.percap, paste0("r5_percapita_conv_", clean_string(v)))
+      )
+
+      p.convergence.ssp <- ggplot(plot.data,
+                              aes(x = year, y = value,
+                                  group = interaction(full.model.name,scenario,region,variable,unit))) +
+        facet_grid(model~ssp, scales="free_y") +
+        mark_history() +
+        geom_line(
+          aes(colour = region,
+              linetype = target)
+        ) +
+        scale_color_manual(values = plot.region.colours) +
+        scale_linetype_manual(values = plot.target.linetypes) +
+        theme_jsk() +
+        theme(
+          strip.text.y = element_text(angle = 0)
+        ) +
+        labs(
+          y = y.unit,
+          x = NULL,
+          title = v,
+          subtitle = "per capita",
+          caption = paste0("File: ", IAM_SCENARIOS_FILE)
+        ) +
+        guides(colour = guide_legend(title = NULL),
+               linetype = guide_legend(title = NULL))
+
+      p.convergence.ssp
+
+      save_ggplot(
+        p = p.convergence.ssp,
+        h = 200,
+        w = 300,
+        format = "png",
+        f = file.path(path.figures.activity.percap, paste0("r5_percapita_conv_ssp_", clean_string(v)))
+      )
+
     } else {
       print( paste0("Something went wrong in calculating per capita data for ", v) )
     }
@@ -479,12 +597,289 @@ for (v in vars.all){
 
 
 
+## b) vs GDPpc ----
+# Per GDP on x-axis [per/cap service over per/cap GDP]
+# ... use `to_per_gdp()`
+# example: pkm/$
+gdp.unit <- billion
+
+### Global ----
+
+plot.data.gdp.percap <- scenarios %>%
+  filter(region == "World",
+         variable %in% c("Population",
+                         "GDP|PPP" # note; also possible to use GDP|MER
+         )) %>%
+  to_per_capita_scenariomip(y.u="billion USD_2010/yr")
+gdp.percap.unit <- plot.data.gdp.percap %>% pull(unit) %>% unique()
+
+
+for (v in vars.all){
+
+
+  plot.data <- scenarios %>% filter(region == "World",
+                                    variable %in% c(v,
+                                                    "Population"))
+
+
+  # change to per capita units
+  if (nrow(plot.data%>%filter(variable!="Population"))>0){
+    y.unit <- plot.data %>% filter(variable!="Population") %>% pull(unit) %>% unique()
+
+    if(!is.na(y.unit)){
+      plot.data <- to_per_capita_scenariomip(df=plot.data, y.u=y.unit)
+    } else {
+      print("Unit error.")
+    }
+
+    y.unit.percapita <- plot.data %>% filter(variable!="Population") %>% pull(unit) %>% unique()
+
+    plot.data <- plot.data %>%
+      bind_rows(plot.data.gdp.percap) %>%
+      select(-unit) %>%
+      pivot_wider(names_from = variable, values_from = value)
+
+    # order data by scenarioMIP target scenario and by region
+    plot.data$target <- factor(plot.data$target, levels=c('VLLO','VLHO','L','ML', 'M', 'H'))
+
+
+    # plot
+    if (nrow(plot.data)>0){
+      print(paste0("Plotting ", v, " per capita (over GDP/cap)"))
+
+      p <- ggplot(plot.data,
+                  aes(x = `GDP|PPP`, y = .data[[v]],
+                      group = interaction(full.model.name,scenario,region))) +
+        facet_wrap(~target, ncol = 3) +
+        geom_line(
+          aes(colour = model,
+              linetype = ssp)
+        ) +
+        scale_color_manual(values = plot.model.colors) +
+        scale_linetype_manual(values = plot.ssp.linetypes) +
+        theme_jsk() +
+        theme(
+          strip.text.y = element_text(angle = 0)
+        ) +
+        labs(
+          y = y.unit.percapita,
+          x = gdp.percap.unit,
+          title = v,
+          subtitle = "per capita, vs GDP per capita",
+          caption = paste0("File: ", IAM_SCENARIOS_FILE)
+        ) +
+        guides(colour = guide_legend(title = NULL),
+               linetype = guide_legend(title = NULL))
+
+      save_ggplot(
+        p = p,
+        h = 200,
+        w = 300,
+        format = "png",
+        f = file.path(path.figures.activity.percap, paste0("world_percapita_overgdp_", clean_string(v)))
+      )
+
+      write_csv(plot.data, file.path(path.figures.data.activity.percap, paste0("world_percapita_overgdp_", clean_string(v), ".csv")))
+
+    } else {
+      print( paste0("Something went wrong in calculating per capita data for ", v) )
+    }
+
+
+  } else {
+    print( paste0("No data repoted for ", v) )
+  }
+
+
+} # end of loop over variables
+
+
+### R5 ----
+plot.data.gdp.percap <- scenarios %>%
+  filter((region == "World" | grepl(region, pattern=" (R5)", fixed=T)),
+         variable %in% c("Population",
+                         "GDP|PPP" # note; also possible to use GDP|MER
+         )) %>%
+  to_per_capita_scenariomip(y.u="billion USD_2010/yr")
+gdp.percap.unit <- plot.data.gdp.percap %>% pull(unit) %>% unique()
+
+
+for (v in vars.all){
+
+  plot.data <- scenarios %>% filter((region == "World" | grepl(region, pattern=" (R5)", fixed=T)),
+                                    variable %in% c(v,
+                                                    "Population"))
+
+  # change to per capita units
+  if (nrow(plot.data%>%filter(variable!="Population"))>0 & v!="GDP|PPP"){
+    y.unit <- plot.data %>% filter(variable!="Population") %>% pull(unit) %>% unique()
+
+    if(!is.na(y.unit)){
+      plot.data <- to_per_capita_scenariomip(df=plot.data, y.u=y.unit)
+    } else {
+      print("Unit error.")
+    }
+
+    y.unit.percapita <- plot.data %>% filter(variable!="Population") %>% pull(unit) %>% unique()
+
+    plot.data <- plot.data %>%
+      bind_rows(plot.data.gdp.percap) %>%
+      select(-unit) %>%
+      pivot_wider(names_from = variable, values_from = value)
+
+
+    # order data by scenarioMIP target scenario and by region
+    plot.data$target <- factor(plot.data$target, levels=c('VLLO','VLHO','L','ML', 'M', 'H'))
+    plot.data$region <- factor(plot.data$region, levels = c("Middle East & Africa (R5)", "Latin America (R5)", "Asia (R5)", "Reforming Economies (R5)", "OECD & EU (R5)", "World"))
+
+
+    # plot
+    if (nrow(plot.data)>0){
+      print(paste0("Plotting ", v, " per capita (over GDP/cap)"))
+
+      p <- ggplot(plot.data,
+                  aes(x = `GDP|PPP`, y = .data[[v]],
+                      group = interaction(full.model.name,scenario,region))) +
+        facet_grid(region~target, scales="free_y") +
+        geom_line(
+          aes(colour = model,
+              linetype = ssp)
+        ) +
+        scale_color_manual(values = plot.model.colors) +
+        scale_linetype_manual(values = plot.ssp.linetypes) +
+        theme_jsk() +
+        theme(
+          strip.text.y = element_text(angle = 0)
+        ) +
+        labs(
+          y = y.unit.percapita,
+          x = gdp.percap.unit,
+          title = v,
+          subtitle = "per capita, vs GDP per capita",
+          caption = paste0("File: ", IAM_SCENARIOS_FILE)
+        ) +
+        guides(colour = guide_legend(title = NULL),
+               linetype = guide_legend(title = NULL))
+
+      save_ggplot(
+        p = p,
+        h = 200,
+        w = 300,
+        format = "png",
+        f = file.path(path.figures.activity.percap, paste0("r5_percapita_overgdp_", clean_string(v)))
+      )
+
+      write_csv(plot.data, file.path(path.figures.data.activity.percap, paste0("r5_percapita_overgdp_", clean_string(v), ".csv")))
+
+
+
+      #### Convergence plots ----
+
+      # Remove models with no data
+      plot.data <- plot.data %>% drop_na(.data[[v]])
+
+
+      p.convergence <- ggplot(plot.data,
+                              aes(x = `GDP|PPP`, y = .data[[v]],
+                                  group = interaction(full.model.name,scenario,region))) +
+        facet_grid(model~target, scales="free_y") +
+        mark_history() +
+        geom_line(
+          aes(colour = region,
+              linetype = ssp)
+        ) +
+        scale_color_manual(values = plot.region.colours) +
+        scale_linetype_manual(values = plot.ssp.linetypes) +
+        theme_jsk() +
+        theme(
+          strip.text.y = element_text(angle = 0)
+        ) +
+        labs(
+          y = y.unit.percapita,
+          x = NULL,
+          title = v,
+          subtitle = "per capita, vs GDP per capita",
+          caption = paste0("File: ", IAM_SCENARIOS_FILE)
+        ) +
+        guides(colour = guide_legend(title = NULL),
+               linetype = guide_legend(title = NULL))
+
+
+      save_ggplot(
+        p = p.convergence,
+        h = 200,
+        w = 300,
+        format = "png",
+        f = file.path(path.figures.activity.percap, paste0("r5_percapita_overgdp_conv_", clean_string(v)))
+      )
+
+      # Faceting by SSP
+      p.convergence.ssp <- ggplot(plot.data,
+                                  aes(x = `GDP|PPP`, y = .data[[v]],
+                                      group = interaction(full.model.name,scenario,region))) +
+        facet_grid(model~ssp, scales="free_y") +
+        mark_history() +
+        geom_line(
+          aes(colour = region,
+              linetype = target)
+        ) +
+        scale_color_manual(values = plot.region.colours) +
+        scale_linetype_manual(values = plot.target.linetypes) +
+        theme_jsk() +
+        theme(
+          strip.text.y = element_text(angle = 0)
+        ) +
+        labs(
+          y = y.unit.percapita,
+          x = NULL,
+          title = v,
+          subtitle = "per capita, vs GDP per capita",
+          caption = paste0("File: ", IAM_SCENARIOS_FILE)
+        ) +
+        guides(colour = guide_legend(title = NULL),
+               linetype = guide_legend(title = NULL))
+
+
+      save_ggplot(
+        p = p.convergence.ssp,
+        h = 200,
+        w = 300,
+        format = "png",
+        f = file.path(path.figures.activity.percap, paste0("r5_percapita_overgdp_conv_ssp_", clean_string(v)))
+      )
+
+
+
+    } else {
+      print( paste0("Something went wrong in calculating per capita data for ", v) )
+    }
+
+
+  } else {
+    print( paste0("No data reported for ", v) )
+  }
+
+
+
+} # end of loop over variables
+
+
+
+
 
 # ... ... ... ... ... ... ... ... ... ------------------------------------------
 # CALCULATED/DERIVED VARIABLES -------------------------------------------------
 # ... ... ... ... ... ... ... ... ... ------------------------------------------
 
 # Electrification ----
+
+# Create subfolders where to save plots and data
+path.figures.electrification <- file.path(path.figures, "electrification")
+path.figures.data.electrification <- file.path(path.figures.data, "electrification")
+
+if(!dir.exists(path.figures.data.electrification)) {dir.create(path.figures.data.electrification, recursive = TRUE)}
+
+
 calculate_electrification <- function(df){
 
   df %>% filter(variable %in% c(
@@ -521,7 +916,9 @@ scenarios.electrification <- scenarios %>% calculate_electrification()
 vars.electrification <- scenarios.electrification %>%
   pull(variable) %>% unique()
 
-## Global ----
+## a) vs time ----
+
+### Global ----
 for (v in vars.electrification){
   plot.data <- scenarios.electrification %>% filter(region == "World",
                                     variable == v)
@@ -560,17 +957,23 @@ for (v in vars.electrification){
       h = 200,
       w = 300,
       format = "png",
-      f = file.path(path.figures, paste0("world_electrification_", clean_string(v)))
+      f = file.path(path.figures.electrification, paste0("world_electrification_", clean_string(v)))
     )
+
+    write_csv(plot.data, file.path(path.figures.data.electrification, paste0("world_electrification_", clean_string(v), ".csv")))
+
   } else {
     print( paste0("No data repoted for ", v) )
   }
 
 }
-## R5 ----
+### R5 ----
 for (v in vars.electrification){
   plot.data <- scenarios.electrification %>% filter((region == "World" | grepl(region, pattern=" (R5)", fixed=T)),
                                     variable == v)
+
+  # order data by region
+  plot.data$region <- factor(plot.data$region, levels = c("Middle East & Africa (R5)", "Latin America (R5)", "Asia (R5)", "Reforming Economies (R5)", "OECD & EU (R5)", "World"))
 
   if (nrow(plot.data)>0){
     print(paste0("Plotting ", v))
@@ -595,6 +998,7 @@ for (v in vars.electrification){
         y = y.unit,
         x = NULL,
         title = v,
+        subtitle = "vs GDP per capita",
         caption = paste0("File: ", IAM_SCENARIOS_FILE)
       ) +
       guides(colour = guide_legend(title = NULL),
@@ -605,8 +1009,11 @@ for (v in vars.electrification){
       h = 200,
       w = 300,
       format = "png",
-      f = file.path(path.figures, paste0("r5_electrification_", clean_string(v)))
+      f = file.path(path.figures.electrification, paste0("r5_electrification_", clean_string(v)))
     )
+
+    write_csv(plot.data, file.path(path.figures.data.electrification, paste0("r5_electrification_", clean_string(v), ".csv")))
+
   } else {
     print( paste0("No data repoted for ", v) )
   }
@@ -615,12 +1022,111 @@ for (v in vars.electrification){
 
 
 
-# Per GDP on x-axis [per/cap service over per/cap GDP]   ----
+## b) vs GDPpc ----
+# Per GDP on x-axis [per/cap service over per/cap GDP]
 # ... use `to_per_gdp()`
 # example: pkm/$
 gdp.unit <- billion
 
-## R5 ----
+### Global ----
+
+plot.data.gdp.percap <- scenarios %>%
+  filter(region == "World",
+         variable %in% c("Population",
+                         "GDP|PPP" # note; also possible to use GDP|MER
+         )) %>%
+  to_per_capita_scenariomip(y.u="billion USD_2010/yr")
+gdp.percap.unit <- plot.data.gdp.percap %>% pull(unit) %>% unique()
+
+
+for (v in c("Energy Service|Residential|Floor Space",
+            "Energy Service|Transportation|Freight",
+            "Energy Service|Transportation|Passenger",
+            "Stocks|Transportation|Light-Duty Vehicle",
+            "Stocks|Transportation|Light-Duty Vehicle|Battery-Electric",
+            vars.electrification)){
+
+  plot.data <- scenarios %>% bind_rows(scenarios.electrification %>% select(-c(Total,Electricity))) %>% filter(region == "World",
+                                                                                                               variable %in% c(v,
+                                                                                                                               "Population"
+                                                                                                               ))
+
+
+  # change to per capita units
+  if (nrow(plot.data%>%filter(variable!="Population"))>0){
+    y.unit <- plot.data %>% filter(variable!="Population") %>% pull(unit) %>% unique()
+
+    if (v %nin% vars.electrification){
+      if(!is.na(y.unit)){
+        plot.data <- to_per_capita_scenariomip(df=plot.data, y.u=y.unit)
+      } else {
+        print("Unit error.")
+      }
+    }
+    y.unit.percapita <- plot.data %>% filter(variable!="Population") %>% pull(unit) %>% unique()
+
+    plot.data <- plot.data %>%
+      bind_rows(plot.data.gdp.percap) %>%
+      select(-unit) %>%
+      pivot_wider(names_from = variable, values_from = value)
+
+    # order data by scenarioMIP target scenario and by region
+    plot.data$target <- factor(plot.data$target, levels=c('VLLO','VLHO','L','ML', 'M', 'H'))
+    plot.data$region <- factor(plot.data$region, levels = c("Middle East & Africa (R5)", "Latin America (R5)", "Asia (R5)", "Reforming Economies (R5)", "OECD & EU (R5)", "World"))
+
+
+  # plot
+  if (nrow(plot.data)>0){
+    print(paste0("Plotting ", v, " (over GDP/cap)"))
+
+    p <- ggplot(plot.data,
+                aes(x = `GDP|PPP`, y = .data[[v]],
+                    group = interaction(full.model.name,scenario,region))) +
+      facet_wrap(~target, ncol = 3) +
+      geom_line(
+        aes(colour = model,
+            linetype = ssp)
+      ) +
+      scale_color_manual(values = plot.model.colors) +
+      scale_linetype_manual(values = plot.ssp.linetypes) +
+      theme_jsk() +
+      theme(
+        strip.text.y = element_text(angle = 0)
+      ) +
+      labs(
+        y = y.unit,
+        x = gdp.percap.unit,
+        title = v,
+        subtitle = "vs GDP per capita",
+        caption = paste0("File: ", IAM_SCENARIOS_FILE)
+      ) +
+      guides(colour = guide_legend(title = NULL),
+             linetype = guide_legend(title = NULL))
+
+    save_ggplot(
+      p = p,
+      h = 200,
+      w = 300,
+      format = "png",
+      f = file.path(path.figures.electrification, paste0("world_overgdp_", clean_string(v)))
+    )
+
+    write_csv(plot.data, file.path(path.figures.data.electrification, paste0("world_overgdp_", clean_string(v), ".csv")))
+
+  } else {
+    print( paste0("Something went wrong in calculating per capita data for ", v) )
+  }
+
+
+} else {
+  print( paste0("No data repoted for ", v) )
+}
+
+
+} # end of loop over variables
+
+
+### R5 ----
 plot.data.gdp.percap <- scenarios %>%
   filter((region == "World" | grepl(region, pattern=" (R5)", fixed=T)),
          variable %in% c("Population",
@@ -640,9 +1146,9 @@ for (v in c("Energy Service|Residential|Floor Space",
                                                     "Population"
                                                     ))
 
-  # order data by scenarioMIP target scenario
+  # order data by scenarioMIP target scenario and by region
   plot.data$target <- factor(plot.data$target, levels=c('VLLO','VLHO','L','ML', 'M', 'H'))
-
+  plot.data$region <- factor(plot.data$region, levels = c("Middle East & Africa (R5)", "Latin America (R5)", "Asia (R5)", "Reforming Economies (R5)", "OECD & EU (R5)", "World"))
 
 
   # change to per capita units
@@ -687,7 +1193,7 @@ for (v in c("Energy Service|Residential|Floor Space",
           y = y.unit.percapita,
           x = gdp.percap.unit,
           title = v,
-          subtitle = "per capita",
+          subtitle = "vs GDP per capita",
           caption = paste0("File: ", IAM_SCENARIOS_FILE)
         ) +
         guides(colour = guide_legend(title = NULL),
@@ -698,8 +1204,11 @@ for (v in c("Energy Service|Residential|Floor Space",
         h = 200,
         w = 300,
         format = "png",
-        f = file.path(path.figures, paste0("r5_overgdp_", clean_string(v)))
+        f = file.path(path.figures.electrification, paste0("r5_overgdp_", clean_string(v)))
       )
+
+      write_csv(plot.data, file.path(path.figures.data.electrification, paste0("r5_overgdp_", clean_string(v), ".csv")))
+
     } else {
       print( paste0("Something went wrong in calculating per capita data for ", v) )
     }
@@ -711,7 +1220,7 @@ for (v in c("Energy Service|Residential|Floor Space",
 
 
 
-}
+} # end of loop over variables
 
 
 
@@ -724,6 +1233,12 @@ for (v in c("Energy Service|Residential|Floor Space",
 
 
 # Final energy per unit of service (GJ/m2, or GJ/pkm) [per/cap service over per/cap GDP]   ----
+
+# Create subfolders where to save plots and data
+path.figures.fe.per.service <- file.path(path.figures, "FE per service")
+path.figures.data.fe.per.service <- file.path(path.figures.data, "FE per service")
+
+if(!dir.exists(path.figures.data.fe.per.service)) {dir.create(path.figures.data.fe.per.service, recursive = TRUE)}
 
 
 to_per_unit_service_scenariomip <- function(df, var.service){
@@ -775,12 +1290,12 @@ to_per_unit_service_scenariomip <- function(df, var.service){
              unit = "GJ/yr/m2")
   } else if (unit.per.service == "EJ/yr/pkm/yr"){
     df <- df %>%
-      mutate(value = value * exa / giga,
-             unit = "GJ/pkm")
+      mutate(value = value * exa / mega,
+             unit = "MJ/pkm")
   } else if (unit.per.service == "EJ/yr/tkm/yr"){
     df <- df %>%
-      mutate(value = value * exa / giga,
-             unit = "GJ/tkm")
+      mutate(value = value * exa / mega,
+             unit = "MJ/tkm")
   } else if (unit.per.service == "EJ/yr/t/yr"){
     df <- df %>%
       mutate(value = value * exa / giga,
@@ -897,6 +1412,7 @@ name.service <- v.service %>%
       print("Unit error.")
     }
 
+    plot.data$target <- factor(plot.data$target, levels=c('VLLO','VLHO','L','ML', 'M', 'H'))
 
 
     # plot
@@ -932,10 +1448,10 @@ name.service <- v.service %>%
         h = 200,
         w = 300,
         format = "png",
-        f = file.path(path.figures, paste0("world_perservice_", clean_string(v), "_", clean_string(name.service)))
+        f = file.path(path.figures.fe.per.service, paste0("world_perservice_", clean_string(v), "_", clean_string(name.service)))
       )
 
-      write_csv(plot.data, file.path(path.figures.data, paste0("world_perservice_", clean_string(v), "_", clean_string(name.service),".csv")))
+      write_csv(plot.data, file.path(path.figures.data.fe.per.service, paste0("world_perservice_", clean_string(v), "_", clean_string(name.service),".csv")))
 
     } else {
       print( paste0("Something went wrong in calculating per unit of service data for ", v) )
@@ -977,6 +1493,9 @@ name.service <- v.service %>%
       print("Unit error.")
     }
 
+    # order data by scenarioMIP target scenario and by region
+    plot.data$target <- factor(plot.data$target, levels=c('VLLO','VLHO','L','ML', 'M', 'H'))
+    plot.data$region <- factor(plot.data$region, levels = c("Middle East & Africa (R5)", "Latin America (R5)", "Asia (R5)", "Reforming Economies (R5)", "OECD & EU (R5)", "World"))
 
 
     # plot
@@ -1015,10 +1534,87 @@ name.service <- v.service %>%
         h = 200,
         w = 300,
         format = "png",
-        f = file.path(path.figures, paste0("r5_perservice_", clean_string(v), "_", clean_string(name.service)))
+        f = file.path(path.figures.fe.per.service, paste0("r5_perservice_", clean_string(v), "_", clean_string(name.service)))
       )
 
-      write_csv(plot.data, file.path(path.figures.data, paste0("r5_perservice_", clean_string(v), "_", clean_string(name.service), ".csv")))
+      write_csv(plot.data, file.path(path.figures.data.fe.per.service, paste0("r5_perservice_", clean_string(v), "_", clean_string(name.service), ".csv")))
+
+
+      #### Convergence plots ----
+
+      # Remove models with no data
+      plot.data <- plot.data %>% drop_na(value)
+
+      p.convergence <- ggplot(plot.data,
+                              aes(x = year, y = value,
+                                  group = interaction(full.model.name,scenario,region,variable,unit))) +
+        facet_grid(model~target, scales="free_y") +
+        mark_history() +
+        geom_line(
+          aes(colour = region,
+              linetype = ssp)
+        ) +
+        scale_color_manual(values = plot.region.colours) +
+        scale_linetype_manual(values = plot.ssp.linetypes) +
+        theme_jsk() +
+        theme(
+          strip.text.y = element_text(angle = 0)
+        ) +
+        labs(
+          y = y.unit,
+          x = NULL,
+          title = v,
+          subtitle = paste0("per unit of service (", name.service,")"),
+          caption = paste0("File: ", IAM_SCENARIOS_FILE)
+        ) +
+        guides(colour = guide_legend(title = NULL),
+               linetype = guide_legend(title = NULL))
+
+
+      save_ggplot(
+        p = p.convergence,
+        h = 200,
+        w = 300,
+        format = "png",
+        f = file.path(path.figures.fe.per.service, paste0("r5_perservice_conv_", clean_string(v)))
+      )
+
+      # Faceting by SSP
+      p.convergence.ssp <- ggplot(plot.data,
+                                  aes(x = year, y = value,
+                                      group = interaction(full.model.name,scenario,region,variable,unit))) +
+        facet_grid(model~ssp, scales="free_y") +
+        mark_history() +
+        geom_line(
+          aes(colour = region,
+              linetype = target)
+        ) +
+        scale_color_manual(values = plot.region.colours) +
+        scale_linetype_manual(values = plot.target.linetypes) +
+        theme_jsk() +
+        theme(
+          strip.text.y = element_text(angle = 0)
+        ) +
+        labs(
+          y = y.unit,
+          x = NULL,
+          title = v,
+          subtitle = paste0("per unit of service (", name.service,")"),
+          caption = paste0("File: ", IAM_SCENARIOS_FILE)
+        ) +
+        guides(colour = guide_legend(title = NULL),
+               linetype = guide_legend(title = NULL))
+
+
+      save_ggplot(
+        p = p.convergence.ssp,
+        h = 200,
+        w = 300,
+        format = "png",
+        f = file.path(path.figures.fe.per.service, paste0("r5_perservice_conv_ssp_", clean_string(v)))
+      )
+
+
 
     } else {
       print( paste0("Something went wrong in calculating per capita data for ", v) )
@@ -1083,6 +1679,8 @@ name.service <- v.service %>%
       select(-unit) %>%
       pivot_wider(names_from = variable, values_from = value)
 
+    plot.data$target <- factor(plot.data$target, levels=c('VLLO','VLHO','L','ML', 'M', 'H'))
+
 
     # plot
     if (nrow(plot.data)>0){
@@ -1106,7 +1704,7 @@ name.service <- v.service %>%
           y = y.unit,
           x = gdp.percap.unit,
           title = v,
-          subtitle = paste0("per unit of service (", name.service,")"),
+          subtitle = paste0("per unit of service (", name.service,") - vs GDP per capita"),
           caption = paste0("File: ", IAM_SCENARIOS_FILE)
         ) +
         guides(colour = guide_legend(title = NULL),
@@ -1117,10 +1715,10 @@ name.service <- v.service %>%
         h = 200,
         w = 300,
         format = "png",
-        f = file.path(path.figures, paste0("world_perservice_overgdp_", clean_string(v), "_", clean_string(name.service)))
+        f = file.path(path.figures.fe.per.service, paste0("world_perservice_overgdp_", clean_string(v), "_", clean_string(name.service)))
       )
 
-      write_csv(plot.data, file.path(path.figures.data, paste0("world_perservice_overgdp_", clean_string(v), "_", clean_string(name.service), ".csv")))
+      write_csv(plot.data, file.path(path.figures.data.fe.per.service, paste0("world_perservice_overgdp_", clean_string(v), "_", clean_string(name.service), ".csv")))
 
     } else {
       print( paste0("Something went wrong in calculating per capita data for ", v) )
@@ -1174,6 +1772,9 @@ name.service <- v.service %>%
       select(-unit) %>%
       pivot_wider(names_from = variable, values_from = value)
 
+    # order data by scenarioMIP target scenario and by region
+    plot.data$target <- factor(plot.data$target, levels=c('VLLO','VLHO','L','ML', 'M', 'H'))
+    plot.data$region <- factor(plot.data$region, levels = c("Middle East & Africa (R5)", "Latin America (R5)", "Asia (R5)", "Reforming Economies (R5)", "OECD & EU (R5)", "World"))
 
 
     # plot
@@ -1198,7 +1799,7 @@ name.service <- v.service %>%
           y = y.unit,
           x = gdp.percap.unit,
           title = v,
-          subtitle = paste0("per unit of service (", name.service,")"),
+          subtitle = paste0("per unit of service (", name.service,") - vs GDP per capita"),
           caption = paste0("File: ", IAM_SCENARIOS_FILE)
         ) +
         guides(colour = guide_legend(title = NULL),
@@ -1209,10 +1810,10 @@ name.service <- v.service %>%
         h = 200,
         w = 300,
         format = "png",
-        f = file.path(path.figures, paste0("r5_perservice_overgdp_", clean_string(v), "_", clean_string(name.service)))
+        f = file.path(path.figures.fe.per.service, paste0("r5_perservice_overgdp_", clean_string(v), "_", clean_string(name.service)))
       )
 
-      write_csv(plot.data, file.path(path.figures.data, paste0("r5_perservice_overgdp_", clean_string(v), "_", clean_string(name.service), ".csv")))
+      write_csv(plot.data, file.path(path.figures.data.fe.per.service, paste0("r5_perservice_overgdp_", clean_string(v), "_", clean_string(name.service), ".csv")))
 
     } else {
       print( paste0("Something went wrong in calculating per capita data for ", v) )
@@ -1230,8 +1831,8 @@ name.service <- v.service %>%
 
 # ---- Final Energy intensity per unit of GDP ----
 
-  path.figures.fe.intensity <- file.path(path.figures, "fe intensity")
-  path.figures.data.fe.intensity <- file.path(path.figures.data, "fe intensity")
+  path.figures.fe.intensity <- file.path(path.figures, "FE intensity")
+  path.figures.data.fe.intensity <- file.path(path.figures.data, "FE intensity")
 
   if(!dir.exists(path.figures.data.fe.intensity)) {dir.create(path.figures.data.fe.intensity, recursive = TRUE)}
 
@@ -1333,6 +1934,7 @@ vars.fe.intensity <- c(
       print("Unit error.")
     }
 
+    plot.data$target <- factor(plot.data$target, levels=c('VLLO','VLHO','L','ML', 'M', 'H'))
 
 
     # plot
@@ -1406,6 +2008,9 @@ vars.fe.intensity <- c(
         print("Unit error.")
       }
 
+      # order data by scenarioMIP target scenario and by region
+      plot.data$target <- factor(plot.data$target, levels=c('VLLO','VLHO','L','ML', 'M', 'H'))
+      plot.data$region <- factor(plot.data$region, levels = c("Middle East & Africa (R5)", "Latin America (R5)", "Asia (R5)", "Reforming Economies (R5)", "OECD & EU (R5)", "World"))
 
 
       # plot
@@ -1447,6 +2052,81 @@ vars.fe.intensity <- c(
         )
 
         write_csv(plot.data, file.path(path.figures.data.fe.intensity, paste0("r5_intensity_pergdp_", clean_string(v), ".csv")))
+
+
+        #### Convergence plots ----
+
+        # Remove models with no data
+        plot.data <- plot.data %>% drop_na(value)
+
+        p.convergence <- ggplot(plot.data,
+                                aes(x = year, y = value,
+                                    group = interaction(full.model.name,scenario,region,variable,unit))) +
+          facet_grid(model~target, scales="free_y") +
+          mark_history() +
+          geom_line(
+            aes(colour = region,
+                linetype = ssp)
+          ) +
+          scale_color_manual(values = plot.region.colours) +
+          scale_linetype_manual(values = plot.ssp.linetypes) +
+          theme_jsk() +
+          theme(
+            strip.text.y = element_text(angle = 0)
+          ) +
+          labs(
+            y = y.unit,
+            x = NULL,
+            title = v,
+            subtitle = "per unit of GDP|PPP",
+            caption = paste0("File: ", IAM_SCENARIOS_FILE)
+          ) +
+          guides(colour = guide_legend(title = NULL),
+                 linetype = guide_legend(title = NULL))
+
+
+        save_ggplot(
+          p = p.convergence,
+          h = 200,
+          w = 300,
+          format = "png",
+          f = file.path(path.figures.fe.intensity, paste0("r5_intensity_pergdp_conv_", clean_string(v)))
+        )
+
+        # Faceting by SSP
+        p.convergence.ssp <- ggplot(plot.data,
+                                    aes(x = year, y = value,
+                                        group = interaction(full.model.name,scenario,region,variable,unit))) +
+          facet_grid(model~ssp, scales="free_y") +
+          mark_history() +
+          geom_line(
+            aes(colour = region,
+                linetype = target)
+          ) +
+          scale_color_manual(values = plot.region.colours) +
+          scale_linetype_manual(values = plot.target.linetypes) +
+          theme_jsk() +
+          theme(
+            strip.text.y = element_text(angle = 0)
+          ) +
+          labs(
+            y = y.unit,
+            x = NULL,
+            title = v,
+            subtitle = "per unit of GDP|PPP",
+            caption = paste0("File: ", IAM_SCENARIOS_FILE)
+          ) +
+          guides(colour = guide_legend(title = NULL),
+                 linetype = guide_legend(title = NULL))
+
+
+        save_ggplot(
+          p = p.convergence.ssp,
+          h = 200,
+          w = 300,
+          format = "png",
+          f = file.path(path.figures.fe.intensity, paste0("r5_intensity_pergdp_conv_ssp_", clean_string(v)))
+        )
 
       } else {
         print( paste0("Something went wrong in calculating per unit of service data for ", v) )
@@ -1501,6 +2181,7 @@ vars.fe.intensity <- c(
       select(-unit) %>%
       pivot_wider(names_from = variable, values_from = value)
 
+    plot.data$target <- factor(plot.data$target, levels=c('VLLO','VLHO','L','ML', 'M', 'H'))
 
 
     # plot
@@ -1525,7 +2206,7 @@ vars.fe.intensity <- c(
           y = y.unit,
           x = gdp.percap.unit,
           title = v,
-          subtitle = paste0("per unit of GDP|PPP"),
+          subtitle = paste0("per unit of GDP|PPP - vs GDP per capita"),
           caption = paste0("File: ", IAM_SCENARIOS_FILE)
         ) +
         guides(colour = guide_legend(title = NULL),
@@ -1592,6 +2273,9 @@ vars.fe.intensity <- c(
         select(-unit) %>%
         pivot_wider(names_from = variable, values_from = value)
 
+      # order data by scenarioMIP target scenario and by region
+      plot.data$target <- factor(plot.data$target, levels=c('VLLO','VLHO','L','ML', 'M', 'H'))
+      plot.data$region <- factor(plot.data$region, levels = c("Middle East & Africa (R5)", "Latin America (R5)", "Asia (R5)", "Reforming Economies (R5)", "OECD & EU (R5)", "World"))
 
 
       # plot
@@ -1616,7 +2300,7 @@ vars.fe.intensity <- c(
             y = y.unit,
             x = gdp.percap.unit,
             title = v,
-            subtitle = paste0("per unit of GDP|PPP"),
+            subtitle = paste0("per unit of GDP|PPP - vs GDP per capita"),
             caption = paste0("File: ", IAM_SCENARIOS_FILE)
           ) +
           guides(colour = guide_legend(title = NULL),

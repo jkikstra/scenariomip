@@ -1000,7 +1000,7 @@ remove_scenarios_with_issues <- function(df){
   return(
     df %>%
       filter(!(scenario=="SSP2 - Medium Emissions_a" & model=="GCAM"), # reporting error; likely unit issue (at least in passenger transport pkm)
-             !(model=="MESSAGEix-GLOBIOM 2.1-M-R12"), # only keep MESSAGE model that has "GAINS" in the name
+             !(full.model.name=="MESSAGEix-GLOBIOM 2.1-M-R12"), # only keep MESSAGE model that has "GAINS" in the name
              # !(scenario=="..." & model=="...")
              )
   )
