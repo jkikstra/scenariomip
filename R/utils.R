@@ -999,7 +999,7 @@ add_sector_and_species_columns <- function(df){
 remove_scenarios_with_issues <- function(df){
   return(
     df %>%
-      filter(!(scenario=="SSP2 - Medium Emissions_a" & model=="GCAM"), # reporting error; likely unit issue (at least in passenger transport pkm)
+      filter(!(scenario=="SSP2 - Medium Emissions_a" & full.model.name=="GCAM 7.1 scenarioMIP"), # reporting error; likely unit issue (at least in passenger transport pkm)
              !(full.model.name=="MESSAGEix-GLOBIOM 2.1-M-R12"), # only keep MESSAGE model that has "GAINS" in the name
              # !(scenario=="..." & model=="...")
              )
