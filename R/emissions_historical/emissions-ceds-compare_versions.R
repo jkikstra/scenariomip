@@ -158,7 +158,7 @@ for (spec in ceds.species){
 }
 
 
-### By sector ----
+### Plot by sector ----
 for (sec in ceds.sectors){
   plot.data <- ceds.world %>% filter(sector == sec)
   if (!(plot.data %>% pull(value) %>% sum() == 0)){
@@ -201,4 +201,27 @@ FILES.pdf <- FILES.pdf[grepl(FILES.pdf,pattern=".pdf",fixed=T)]
 qpdf::pdf_combine(
   input = FILES.pdf,
   output = file.path(path.figures, "ceds-update_all_world.pdf")
+)
+
+## Aggregated across countries and sectors -------------------------------------
+ceds.world.total <- ceds %>% reframe(
+  value = sum(value),
+  .by = c("model", "scenario", "unit", "year", "version", "species")
+) %>% mutate(region="World")
+p.ceds <- ggplot(ceds.world.total,
+                 aes(x=year,y=value)) +
+  facet_wrap(interaction(species,unit)~., nrow = 5, scales = "free_y") +
+  geom_line(aes(colour=version)) +
+  theme_jsk() +
+  labs(title = spec,
+       subtitle = "World",
+       y = NULL,
+       caption = "CEDS_v_2025_03_11")
+save_ggplot(
+  p = p.ceds,
+  f = file.path(path.figures,
+                paste0("ceds-update-world-totals_all-species")  ),
+  format = "pdf",
+  w = 300,
+  h = 300
 )
