@@ -156,8 +156,8 @@ vars.all <- c(
 
 
 # Loading IAM data ----
-# IAM_SCENARIOS_LOCATION <- here("data", "data_vetting", "scens")
-IAM_SCENARIOS_LOCATION <- "C:/Users/zaini/OneDrive - IIASA/Documents/ScenarioMIP demand"
+IAM_SCENARIOS_LOCATION <- here("data", "data_vetting", "scens")
+# IAM_SCENARIOS_LOCATION <- "C:/Users/zaini/OneDrive - IIASA/Documents/ScenarioMIP demand"
 
 # IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-02-17.csv"
 # IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-03-05.csv" # version 'demand_world_r5_total_directvariables_v20250307_a.zip'
@@ -2328,3 +2328,105 @@ vars.fe.intensity <- c(
 
   } # end of loop over vars.fe.intensity
 
+
+
+# Convergence indicators -------------------------------------------------------
+
+#' potential indicators (all based on per-capita indicators):
+#' - simple ratio (e.g. North/South)
+#' - standard deviation
+#' - standard deviation (normalised)
+#' - palma ratio (ratio based on shared of population)
+#' - Gini coefficient
+## data ----
+scenarios
+
+vars.convergence <- c(
+  "Final Energy",
+  "Energy Service|Residential and Commercial|Floor Space",
+  "Energy Service|Transportation|Passenger"
+)
+
+# per cap data
+scenarios.convergence <- NULL
+for (v in vars.convergence){
+  df <- scenarios %>% filter(variable%in%c(v,"Population") )
+  df.unit <- df %>% filter(variable!="Population") %>% distinct(unit) %>% pull(unit)
+  df.pcap <- df %>%
+    to_per_capita_scenariomip(y.u = df.unit)
+  scenarios.convergence <- scenarios.convergence %>% bind_rows(df.pcap)
+}
+
+
+# Global North / Global South ----
+# tbd.
+#' steps:
+#' 1) aggregate regions (weighted mean; weight per capita values by population)
+#' 2) calculate North/South ratio
+#' 3) plot
+
+## R10  ----
+
+### Standard deviation ----
+scenarios.convergence.r10.sd <- scenarios.convergence %>%
+  filter(grepl(region, pattern=" (R10)", fixed=T)) %>%
+  reframe(
+    sd.r10 = sd(value),
+    .by = c(model,scenario,variable,unit,year,target,ssp,full.model.name) # across regions
+  )
+
+p.sd.r10 <- ggplot(scenarios.convergence.r10.sd %>% filter(variable=="Final Energy", year>=2000),
+                   aes(x = year, y = sd.r10,
+                       group = interaction(model,scenario,variable))) +
+  facet_grid(.~target, scales="free_y") +
+  mark_history() +
+  geom_line(
+    aes(colour = model,
+        linetype = ssp)
+  ) +
+  scale_color_manual(values = plot.model.colors) +
+  scale_linetype_manual(values = plot.ssp.linetypes) +
+  theme_jsk() +
+  theme(
+    strip.text.y = element_text(angle = 0)
+  ) +
+  labs(
+    y = "Standard deviation",
+    x = NULL,
+    title = "Final Energy",
+    subtitle = "per capita",
+    caption = paste0("File: ", IAM_SCENARIOS_FILE)
+  ) +
+  guides(colour = guide_legend(title = NULL),
+         linetype = guide_legend(title = NULL))
+p.sd.r10
+
+### Standard deviation (normalised to 1 in 2025) ----
+p.sd.r10.normalised <- ggplot(scenarios.convergence.r10.sd %>% filter(variable=="Final Energy", year>=2000) %>%
+                                rename(value=sd.r10) %>% mutate(region="World") %>% normalise_iamc_long(starting.year=2025) %>%
+                                rename(sd.r10=value),
+                              aes(x = year, y = sd.r10,
+                                  group = interaction(model,scenario,variable))) +
+  facet_grid(ssp~target, scales="free_y") +
+  mark_history() +
+  geom_line(
+    linewidth=1.2,
+    aes(colour = model,
+        linetype = ssp)
+  ) +
+  scale_color_manual(values = plot.model.colors) +
+  scale_linetype_manual(values = plot.ssp.linetypes) +
+  theme_jsk() +
+  theme(
+    strip.text.y = element_text(angle = 0)
+  ) +
+  labs(
+    y = "Standard deviation (normalised to 2025)",
+    x = NULL,
+    title = "Final Energy",
+    subtitle = "per capita",
+    caption = paste0("File: ", IAM_SCENARIOS_FILE)
+  ) +
+  guides(colour = guide_legend(title = NULL),
+         linetype = guide_legend(title = NULL))
+p.sd.r10.normalised
