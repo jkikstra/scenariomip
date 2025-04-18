@@ -199,7 +199,7 @@ IAM_SCENARIOS_LOCATION <- "C:/Users/zaini/OneDrive - IIASA/Documents/ScenarioMIP
 
 # IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-02-17.csv"
 # IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-03-05.csv" # version 'demand_world_r5_total_directvariables_v20250307_a.zip'
-IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-03-11.csv" # version presented in ScenarioMIP demand-side meeting on 13.03.2025
+IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-04-16.csv" # version presented in ScenarioMIP demand-side meeting on 13.03.2025
 
 scenarios.alldata <- load_csv_iamc(file.path(IAM_SCENARIOS_LOCATION, IAM_SCENARIOS_FILE), mode = "fast")
 
@@ -305,7 +305,7 @@ for (v in vars.all) {
 
     write_csv(plot.data, file.path(path.figures.data.activity.total, paste0("world_total_", clean_string(v), ".csv")))
   } else {
-    print(paste0("No data repoted for ", v))
+    print(paste0("No data reported for ", v))
   }
 }
 ## R5 ----
@@ -1551,7 +1551,7 @@ for (v in vars.all) {
 
 
   # change to per capita units
-  if (nrow(plot.data %>% filter(variable != "Population")) > 0) {
+  if (nrow(plot.data %>% filter(variable != "Population")) > 0 & v != "GDP|PPP") {
     y.unit <- plot.data %>%
       filter(variable != "Population") %>%
       pull(unit) %>%
@@ -2420,8 +2420,8 @@ scenarios.with.aggregations <- bind_rows(scenarios, iron_and_steel)
 
 ## choose variable to be calculated per unit of service: ----
 
-v <- "Final Energy|Transportation"
-v.service <- "Energy Service|Transportation|Passenger"
+v <- "Final Energy|Residential and Commercial"
+v.service <- "Energy Service|Residential and Commercial|Floor Space"
 
 #' Final Energy variables to be calculated per unit of service:
 #' "Final Energy|Residential and Commercial",
@@ -3047,7 +3047,7 @@ if (nrow(plot.data %>% filter(variable != v.service)) > 0) { # only if you have 
       select(-variable.y)
 
     gini.pop.weighted.data <- conv.data.gini %>%
-      drop_na(population) %>%
+      drop_na(population, value) %>%
       group_by(model, scenario, variable, unit, year, target, ssp, full.model.name) %>%
       reframe(gini.pop.weighted = weighted.gini(x = value, w = population)$bcwGini) %>%
       ungroup()
