@@ -24,7 +24,36 @@ source(here("R","utils.R"))
 
 
 #' TODO:
-#' - [ ] ...
+#' 
+#' Crucial:
+#' - [ ] Emissions|N2O|AFOLU|Land|Land Use and Land-Use Change ==> 'Agriculture' ==> check on common-definitions too!
+#'    - [ ] Add 'AFOLU|Land' - 'AFOLU|Land|Fires' to 'AFOLU|Agriculture'
+# Emissions|N2O|AFOLU	Emissions of nitrous oxide (N2O) from agriculture, forestry and other land use (IPCC 1996 category 4, 5 - IPCC 2006 category 3), including agricultural emissions from livestock, rice cultivation and soil management as well as emissions from land use and land-use change such as deforestation, conversion of non-forest natural land, and drained peatlands
+# Emissions|N2O|AFOLU [NGHGI]	Emissions of nitrous oxide (N2O) from agriculture, forestry and other land use (IPCC 1996 category 4, 5 - IPCC 2006 category 3) in line with the national greenhouse gas inventories (NGHGI)
+# Emissions|N2O|AFOLU|Agricultural Waste Burning	Emissions from agricultural waste burning (IPCC 1996 category 4F - partially IPCC 2006 category 3C1)
+# Emissions|N2O|AFOLU|Agriculture	Emissions of nitrous oxide (N2O) from the agriculture sector (IPCC 1996 category 4 - IPCC 2006 category 3A and 3C except 3C1)
+# Emissions|N2O|AFOLU|Agriculture|Livestock	Emissions of nitrous oxide (N2O) from livestock in the agriculture sector (IPCC 1996 category 4A and 4B - IPCC 2006 category 3A)
+# Emissions|N2O|AFOLU|Agriculture|Livestock|Enteric Fermentation	Emissions of nitrous oxide (N2O) from enteric fermentation of livestock (IPCC 1996 category 4A - IPCC 2006 category 3A1) in the agriculture sector
+# Emissions|N2O|AFOLU|Agriculture|Livestock|Manure Management	Emissions of nitrous oxide (N2O) from processes involving manure (waste) management in Livestock in the agriculture sector (IPCC 1996 category 4B - IPCC 2006 category 3A2)
+# Emissions|N2O|AFOLU|Agriculture|Managed Soils	Emissions of nitrous oxide (N2O) from soil management practices in the agriculture sector (IPCC 1996 category 4D - IPCC 2006 category 3C4 and 3C5)
+# Emissions|N2O|AFOLU|Agriculture|Rice	Emissions of nitrous oxide (N2O) from rice cultivation (IPCC 1996 category 4C - IPCC 2006 category 3C7)
+# Emissions|N2O|AFOLU|Land	Emissions of nitrous oxide (N2O) from forestry and other land use and land use change. Removals in this variable include agroforestry, re/afforestation, biochar, soil carbon management and forest management.
+# Emissions|N2O|AFOLU|Land|Fires	Emissions from land fires and deforestation & degradation fires
+# Emissions|N2O|AFOLU|Land|Fires|Forest Burning	Emissions from boreal forest fires, temperate forest fires, and tropical deforestation & degradation fires
+# Emissions|N2O|AFOLU|Land|Fires|Grassland Burning	Emissions from savanna, grassland, and shrubland fires
+# Emissions|N2O|AFOLU|Land|Fires|Peat Burning	Emissions from peat fires
+# Emissions|N2O|AFOLU|Land|Harvested Wood Products	Emissions and removals from harvested wood products (HWP) (no clear IPCC 1996 category - IPCC 2006 category 3D1)
+# Emissions|N2O|AFOLU|Land|Land Use and Land-Use Change	Emissions and removals from forest land, cropland, grassland, settlements and other natural land (partially IPCC 1996 category 5 - IPCC 2006 category 3B except 3B1biii, 3B2biii, 3B3biii, 3B5biv, 3B6biv and 3B4).
+# Emissions|N2O|AFOLU|Land|Other	Emissions and removals from land that cannot be  accommodated in other categories (no clear IPCC 1996 category - IPCC 2006 category 3D2)
+# Emissions|N2O|AFOLU|Land|Wetlands	Emissions of nitrous oxide (N2O) from managed wetlands (e.g., peatland), including emissions from drained wetlands used for agriculture, forestry or other uses (IPCC 2006 categories 3B1biii, 3B2biii and 3B3biii, 3B5biv, 3B6biv), and emissions from rewetted wetlands (IPCC 2006 category 3B4)
+
+#' 
+#' - [ ] resolve zero of CO2 agriculture
+#' 
+#' Other:
+#' - [ ] create historical sectoral "World"; especially check aviation & shipping
+#' - [ ] add "World" region with 'ALL' iso to common-definitions, and therefore to regional data?
+#' - [ ] check EDGER "Biomass Burning" sector
 
 
 ```
@@ -34,11 +63,18 @@ source(here("R","utils.R"))
 ```{r}
 IAM_SCENARIOS_LOCATION <- here("data", "data_vetting", "scens")
 # IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-01-20.csv" # first version shared with the Teams
-IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-02-17.csv" # updated version (after REMIND comment)
+# IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-02-17.csv" # updated version (after REMIND comment)
+# IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-03-03.csv" # after 1 March deadline (update later for at least message)
+# IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-03-11.csv" # after 1 March deadline (including message update)
+IAM_SCENARIOS_FILE <- "scenarios_scenariomip_message_eceinternal_2025-04-09.csv" # message internal before 11 April deadline
 
-HISTORY.COUNTRY.AND.GLOBAL <- "cmip7_history_0002.csv"
-HISTORY.IAMREGIONS <- "iamc_regions_cmip7_history_0002.csv"
-HISTORY.COMPOSITE.GLOBAL.INCL.FGASES <- "cmip7_history_world_0011.csv"
+MESSAGE.INTERNAL.OR.SCEN.EXPL <- "internal"
+
+HISTORY.COUNTRY.AND.GLOBAL <- "cmip7_history_0012.csv"
+# HISTORY.IAMREGIONS <- "iamc_regions_cmip7_history_0002.csv"
+HISTORY.IAMREGIONS <- "iamc_regions_cmip7_history_0010.csv"
+# HISTORY.COMPOSITE.GLOBAL.INCL.FGASES <- "cmip7_history_world_0011.csv"
+HISTORY.COMPOSITE.GLOBAL.INCL.FGASES <- "cmip7_history_world_0012.csv" # not including GFED fires
 
 ```
 
@@ -54,11 +90,25 @@ scenarios <- scenarios %>%
   filter(str_starts(Variable, "Emissions"))
 # to long format
 scenarios <- scenarios %>%
-  iamc_wide_to_long(upper.to.lower = T) %>% 
+  iamc_wide_to_long(upper.to.lower = T) %>% #ifelse(MESSAGE.INTERNAL.OR.SCEN.EXPL%in%c("scen.exp.scenariomip"),T,F)) %>% 
   filter(year<=2100)
+# ece-internal database specific stuff:
+if (MESSAGE.INTERNAL.OR.SCEN.EXPL!="internal"){
+  scenarios <- scenarios  %>% mutate(model="MESSAGE")
+}
+# remove scenarios we do not want
+scenarios <- scenarios %>%
+  filter(
+    !(model=="MESSAGEix-GLOBIOM 2.1-M-R12")
+  )
+
 
 model.list <- scenarios %>% pull(model) %>% unique()
 model.list.simple <- scenarios %>% distinct(model) %>% simplify_model_names() %>% pull(model) %>% unique()
+scenario.list.main <- scenarios %>% distinct(scenario) %>% filter(!grepl("_", x=scenario)) %>% pull(scenario)
+scenario.list.alternative <- scenarios %>% distinct(scenario) %>% filter(grepl("_", x=scenario)) %>% pull(scenario)
+
+stopifnot(length(model.list)==length(model.list.simple)) # check that there is not multiple model versions in the data
 
 ```
 
@@ -209,13 +259,15 @@ write_delim(x = scenarios_harmonization %>%
 
 ### Historical data
 
+#### CEDS & GFED
+
 ```{r}
 
 format_historical <- function(df){
   return(
     df %>% 
       filter(
-        year>=1997, year<=2022 # ad-hoc; because in this version GFED doesn't go earlier than 1997, and CEDS doesn't have 2023
+        year>=1990, year<=2023 # note that the current GFED data source doesn't go earlier than 1997
       )
   )
 }
@@ -238,23 +290,162 @@ format_historical_add_total <- function(df){
   )
 }
 
+format_historical_onlykeep_iamnativeregions <- function(df){
+  only.selected.native.regions <- df %>% filter(
+      grepl(x=region, pattern="MESSAGEix-GLOBIOM-GAINS 2.1-R12", fixed=T)|
+      grepl(x=region, pattern="AIM 3.0", fixed=T)|
+      grepl(x=region, pattern="COFFEE 1.5", fixed=T)|
+      grepl(x=region, pattern="GCAM 7.1", fixed=T)|
+      grepl(x=region, pattern="IMAGE 3.4", fixed=T)|
+      grepl(x=region, pattern="REMIND-MAgPIE 3.4-4.8", fixed=T)|
+      grepl(x=region, pattern="WITCH 6.0", fixed=T)
+    )
+
+  return(
+    only.selected.native.regions
+  )
+}
+
+format_historical_add_world_onlykeep_iamnativeregions <- function(df){
+  only.selected.native.regions <- format_historical_onlykeep_iamnativeregions(df)
+  
+  world <- only.selected.native.regions %>% 
+    reframe(
+      value = sum(value),
+      .by = c("model", "scenario", "variable", "unit", "year")
+    ) %>% 
+    mutate(region="World") %>% 
+    select(model,scenario,region,variable,unit,year,value)
+  
+  return(
+    bind_rows(
+      only.selected.native.regions,
+      world
+    )
+  )
+}
+
+
 # In harmonization sectors
-hist.national <- vroom(here("data", "data_vetting", "hist", HISTORY.COUNTRY.AND.GLOBAL)) %>% 
+hist.national <- vroom(here("data", "data_vetting", "hist", HISTORY.COUNTRY.AND.GLOBAL)) %>%
   iamc_wide_to_long() %>%
-  format_historical() %>% 
+  format_historical() %>%
   format_historical_add_total()
 hist.regional <- vroom(here("data", "data_vetting", "hist", HISTORY.IAMREGIONS)) %>% 
   iamc_wide_to_long() %>%
   format_historical() %>% 
   format_historical_add_total() %>% 
-  filter(
-    !grepl(region, pattern="REMIND 3.1", fixed=T)
-  )
+  # filter(
+  #   !grepl(region, pattern="REMIND 3.1", fixed=T)
+  # ) %>% 
+  format_historical_onlykeep_iamnativeregions()
 
 # global level, all species
 hist.global.allspecies <- vroom(here("data", "data_vetting", "hist", HISTORY.COMPOSITE.GLOBAL.INCL.FGASES)) %>% 
   iamc_wide_to_long() %>% 
   format_historical()
+
+```
+
+#### Additional data
+
+##### EDGAR (provided by Steve Smith)
+
+```{r}
+# EDGAR.AND.FAO.FILES.FOLDER <- here("data", "data_vetting", "hist", "edgar_and_fao")
+# FILES.csv <- file.path(EDGAR.AND.FAO.FILES.FOLDER, dir(EDGAR.AND.FAO.FILES.FOLDER, pattern = "*.csv"))  # get file names
+# 
+# edgar.fao <- NULL
+# edgar <- NULL
+# fao <- NULL
+# for (i in seq(1,length(FILES.csv))){
+#   edgar.fao <- edgar.fao %>% 
+#     bind_rows(
+#     load_csv_iamc(FILES.csv[i], mode = "fast") %>% 
+#       select(matches("^(iso|sector|units|X\\d{4})$")) %>% rename_with(~ str_remove(., "^X"), matches("^X\\d{4}")) %>% mutate(across(matches("^\\d{4}$"), as.numeric)) %>%  
+#       mutate(model="EDGAR and FAO", scenario = "historical") %>% 
+#       rename(region=iso, variable=sector, unit = units) %>% 
+#       select(model, scenario, variable, region, unit, everything()) %>%
+#       iamc_wide_to_long() %>% 
+#       mutate(sector=variable) %>% 
+#       # edgar
+#       mutate(variable = ifelse(grepl(FILES.csv[i], pattern="E.BC_EDGAR", fixed=T), "Emissions|BC",
+#                                ifelse(grepl(FILES.csv[i], pattern="E.CH4_EDGAR", fixed=T), "Emissions|CH4",
+#                                ifelse(grepl(FILES.csv[i], pattern="E.CO_EDGAR", fixed=T), "Emissions|CO",
+#                                ifelse(grepl(FILES.csv[i], pattern="E.CO2_EDGAR", fixed=T), "Emissions|CO2",
+#                                ifelse(grepl(FILES.csv[i], pattern="E.N2O_EDGAR", fixed=T), "Emissions|N2O",
+#                                ifelse(grepl(FILES.csv[i], pattern="E.NH3_EDGAR", fixed=T), "Emissions|NH3",
+#                                ifelse(grepl(FILES.csv[i], pattern="E.NMVOC_EDGAR", fixed=T), "Emissions|VOC",
+#                                ifelse(grepl(FILES.csv[i], pattern="E.NOx_EDGAR", fixed=T), "Emissions|NOx",
+#                                ifelse(grepl(FILES.csv[i], pattern="E.OC_EDGAR", fixed=T), "Emissions|OC",
+#                                ifelse(grepl(FILES.csv[i], pattern="E.SO2_EDGAR", fixed=T), "Emissions|SO2",
+#                                # ifelse(grepl(FILES.csv[i], pattern="C.CH4_NC_emissions_agriculture", fixed=T), "Emissions|CH4",
+#                                # ifelse(grepl(FILES.csv[i], pattern="C.N2O_NC_emissions_agriculture", fixed=T), "Emissions|N2O",
+#                                NA)))))))))))#))
+#     )  
+# }
+# 
+# edgar.fao %>% pull(unit) %>% unique() # only in kt
+# 
+# # adjust units
+# edgar.fao <- edgar.fao %>% 
+#   mutate_cond(
+#     variable %nin% c("Emissions|N2O"),
+#     unit = "Mt" 
+#   ) %>% 
+#   mutate_cond(
+#     variable %nin% c("Emissions|N2O"),
+#     value = value / 1e3 # from kt to Mt
+#   )
+# 
+# 
+# # sum across all sectors
+# edgar.fao.aggregated.national <- edgar.fao %>% 
+#   reframe(
+#     value = sum(value),
+#     .by = c("model", "scenario", "variable", "region", "unit", "year")
+#   )
+# 
+# # aggregate to MESSAGE regions
+# mr <- vroom(file.path(EDGAR.AND.FAO.FILES.FOLDER, "region_definitions_message.csv")) %>% select(iso, message_r12)
+# edgar.fao.aggregated.regional <- edgar.fao.aggregated.national %>% 
+#   mutate(iso=toupper(region)) %>% select(-region) %>% 
+#   left_join(mr %>% rename(region=message_r12), by = c("iso")) %>% 
+#   reframe(
+#     value = sum(value),
+#     .by = c("model", "scenario", "variable", "region", "unit", "year")
+#   )
+# edgar.fao.aggregated.global <- edgar.fao.aggregated.national %>% 
+#   mutate(region="World") %>%  
+#   reframe(
+#     value = sum(value),
+#     .by = c("model", "scenario", "variable", "region", "unit", "year")
+#   )
+# 
+# edgar.fao.aggregated.global %>% filter(year==2022, variable=="Emissions|CH4")
+
+
+# In harmonization sectors
+HISTORY.COUNTRY.EDGAR <- "edgar_national_0010.csv"
+HISTORY.WORLD.EDGAR <- "edgar_global_0010.csv"
+HISTORY.IAMREGIONS.EDGAR <- "iamc_regions_edgar_history_0010.csv"
+hist.national.edgar <- vroom(here("data", "data_vetting", "hist", HISTORY.COUNTRY.EDGAR)) %>%
+  bind_rows(vroom(here("data", "data_vetting", "hist", HISTORY.WORLD.EDGAR))) %>%
+  iamc_wide_to_long() %>%
+  format_historical() %>%
+  format_historical_add_total() %>% 
+  filter(
+    !(year=2023 & value==0) # data provided by Steve only has EDGAR until 2022 for many sectors, with zeroes reported
+  )
+hist.regional.edgar <- vroom(here("data", "data_vetting", "hist", HISTORY.IAMREGIONS.EDGAR)) %>%
+  iamc_wide_to_long() %>%
+  format_historical() %>%
+  format_historical_add_total() %>%
+  format_historical_add_world_onlykeep_iamnativeregions() %>% 
+  filter(
+    !(year=2023 & value==0) # data provided by Steve only has EDGAR until 2022 for many sectors, with zeroes reported 
+  )
+
 
 ```
 
@@ -358,6 +549,61 @@ ar6like.temp50 <- load_csv_iamc(file.path(IAM_SCENARIOS_LOCATION, IAM_SCENARIOS_
 
 ```
 
+# VETTING flags (HISTORICAL)
+
+```{r}
+
+# all hist
+hist.data.iam.regions <- hist.regional %>% # IAM regions 
+  bind_rows(hist.regional.edgar) %>% # IAM regions
+  bind_rows(hist.national %>% filter(region=="World")) %>% # World 
+  bind_rows(hist.national.edgar %>% filter(region=="World")) %>% # World  
+  filter(!(grepl(variable, pattern="Aircraft", fixed = T) & region!="World")) # don't include domestic aviation in the comparison
+
+write_delim(
+  x = hist.data.iam.regions,
+  file = file.path(IAM_SCENARIOS_LOCATION, paste0("history_iamregions_", substr(IAM_SCENARIOS_FILE, start=nchar(IAM_SCENARIOS_FILE)-13, stop = nchar(IAM_SCENARIOS_FILE)-4),"",".csv")),
+            delim = ","
+)
+
+# scen hist years
+scenarios_harmonization_histyears <- scenarios_harmonization %>% 
+  filter(year%in%c(2015,2020,2025)) %>% 
+  iamc_long_to_wide() %>% 
+  mutate(`2023` = `2020` + (`2025` - `2020`)/5 * 3  ) %>% 
+  select(-`2020`, -`2025`) 
+
+# CEDS: absolute distance (2015, 2023)
+diff.all.hist <- scenarios_harmonization_histyears %>%
+  left_join(hist.data.iam.regions %>% rename(hist.model=model) %>% select(-scenario) %>%   
+            filter(year%in%c(2015,2023)) %>% iamc_long_to_wide() %>% rename(hist.2015=`2015`, hist.2023=`2023`),
+            by = join_by(region, variable, unit),
+            relationship = "many-to-many")
+
+diff.ceds.gfed <- diff.all.hist %>% filter((grepl(hist.model,pattern="CEDSv_2025_03_11", fixed=T) | grepl(hist.model,pattern="GFED", fixed=T) ),
+                                      !grepl(variable, pattern='Total', fixed=T))
+
+diff.ceds.gfed.abs.and.rel <- diff.ceds.gfed %>% 
+  mutate(`Absolute difference (2023)` = `2023`-hist.2023,
+         `Relative difference (2023)` = `Absolute difference (2023)`/hist.2023) %>% 
+  mutate(`Absolute difference (2015)` = `2015`-hist.2015,
+         `Relative difference (2015)` = `Absolute difference (2015)`/hist.2015) %>% 
+  mutate(Information = "difference = model - history")
+View(diff.ceds.gfed.abs.and.rel)
+
+write_delim(
+  x = diff.ceds.gfed.abs.and.rel,
+  file = file.path(IAM_SCENARIOS_LOCATION, paste0("difference_to_CEDS_and_GFED_", substr(IAM_SCENARIOS_FILE, start=nchar(IAM_SCENARIOS_FILE)-13, stop = nchar(IAM_SCENARIOS_FILE)-4),"",".csv")),
+            delim = ","
+)
+
+# TBD: uncertainties
+# Emissions|CO2|Energy Sector
+
+# TBD: trends
+
+```
+
 # Assessments of uncertainties and trends (total by species)
 
 ```{r}
@@ -405,6 +651,25 @@ plot.model.colors <- c(
 
 Description text.
 
+### Plotting functions
+```{r}
+
+shorter_sector_names <- function(df){
+  df %>% 
+    mutate_cond(variable=="Agricultural Waste Burning", variable = "AWB") %>% 
+    mutate_cond(variable=="Energy Sector", variable = "Energy") %>%
+    mutate_cond(variable=="Forest Burning", variable = "Forest Fires") %>%
+    mutate_cond(variable=="Grassland Burning", variable = "Grassland Fires") %>%
+    mutate_cond(variable=="Industrial Sector", variable = "Industry") %>%
+    mutate_cond(variable=="International Shipping", variable = "Intl. Shipping") %>%
+    mutate_cond(variable=="Residential Commercial Other", variable = "ResCom Other") %>%
+    mutate_cond(variable=="Solvents Production and Application", variable = "Solvents") %>%
+    mutate_cond(variable=="Transportation Sector", variable = "Transport") %>%
+    return()
+}
+
+```
+
 ### Global
 
 More text:
@@ -412,18 +677,14 @@ More text:
 ```{r}
 
 # World (all sectors)
+# for (m in c("MESSAGE")){
 for (m in model.list.simple){
-  p.data.model <- scenarios_harmonization %>%
-      filter(region=="World") %>% mutate(full.model.name = model) %>% 
-      simplify_model_names() %>%
-      filter(grepl(model, pattern=m, fixed=T)) %>% 
-      iamc_region_keep_one_level(-1) %>% 
-      iamc_variable_keep_one_level(-1)
   
-  p.data.hist <- hist.national %>% filter(region=="World") %>% 
-        iamc_region_keep_one_level(-1) %>% 
-        iamc_variable_keep_one_level(-1)
-  p.data.hist <- p.data.hist %>% 
+  p.data.hist <- hist.national %>% 
+    filter(region=="World") %>%
+    iamc_region_keep_one_level(-1) %>%
+    iamc_variable_keep_one_level(-1)
+  p.data.hist <- p.data.hist %>% # combine data from CEDS and GFED into one variable
     filter(variable!="Total") %>% # remove separate totals of each historical data source
     bind_rows(
       # add combined total of historical data sources
@@ -433,55 +694,89 @@ for (m in model.list.simple){
           .by = c("scenario", "variable", "region", "unit", "year")
         ) %>% 
         mutate(model = p.data.hist %>% pull(model) %>% unique() %>% paste(collapse = "+"))
+    ) %>% 
+    shorter_sector_names()
+  
+  p.data.hist.edgar <- hist.national.edgar %>% filter(region=="World") %>% 
+        iamc_region_keep_one_level(-1) %>% 
+        iamc_variable_keep_one_level(-1) %>% 
+    shorter_sector_names()
+  
+  for (scenario.set in c("main", "alternative")){
+    if (scenario.set=="main") {s.list <- scenario.list.main} else {s.list <- scenario.list.alternative}
+    p.data.model <- scenarios_harmonization %>%
+      filter(region=="World",
+             scenario%in%s.list) %>% mutate(full.model.name = model) %>%
+      simplify_model_names() %>%
+      filter(grepl(model, pattern=m, fixed=T))
+    if (nrow(p.data.model)==0){
+      next # skip this iteration if there's no model data (e.g. no alternative scenarios submitted)
+    }
+    p.data.model <- p.data.model %>% 
+      iamc_region_keep_one_level(-1) %>%
+      iamc_variable_keep_one_level(-1) %>% 
+      shorter_sector_names()
+    
+    p.emissions.by.model.sector.global <- ggplot(
+      p.data.model,
+      aes(x=year,y=value)
+    ) +
+      facet_wrap(unit~variable, scales="free_y") +
+      
+      # IAMs
+      geom_line(aes(colour=scenario,
+                    linetype=full.model.name,
+                    group=interaction(full.model.name,scenario,region,variable))) +
+      # edgar
+      geom_line(
+        data = p.data.hist.edgar,
+        colour = "darkgrey"
+      ) +
+      geom_point(
+        data = p.data.hist.edgar,
+        colour = "darkgrey",
+        aes(shape = model)
+      ) +
+      
+      # CEDS-GFED
+      geom_line(
+        data = p.data.hist,
+        colour = "black"
+      ) +
+      geom_point(
+        data = p.data.hist,
+        colour = "black",
+        aes(shape = model)
+      ) +
+      
+      
+      
+      theme_jsk() +
+      ylab(NULL) + xlab(NULL) +
+      labs(
+        title = m,
+        subtitle = paste0("Scenario set: ", scenario.set)
+      ) + 
+      mark_history()
+  
+  
+    dir.create(here("data", "data_vetting", "figures", "per-model", m))
+    save_ggplot(
+      p = p.emissions.by.model.sector.global,
+      h = 500,
+      w = 500,
+      format = "pdf",
+      f = here("data", "data_vetting", "figures", "per-model", m, paste0("emissions_global", "_", scenario.set) )
     )
+     
+  }
   
-  
-  
-  p.emissions.by.model.sector.global <- ggplot(
-    p.data.model,
-    aes(x=year,y=value)
-  ) +
-    facet_wrap(unit~variable, scales="free_y") +
-    geom_line(aes(colour=scenario,
-                  linetype=full.model.name,
-                  group=interaction(full.model.name,scenario,region,variable))) +
-    geom_line(
-      data = p.data.hist,
-      colour = "black"
-    ) +
-    geom_point(
-      data = p.data.hist,
-      colour = "black",
-      aes(shape = model)
-    ) +
-    theme_jsk() +
-    ylab(NULL) + xlab(NULL) +
-    labs(
-      title = m
-    ) + 
-    mark_history()
-
-
-  dir.create(here("data", "data_vetting", "figures", "per-model", m))
-  save_ggplot(
-    p = p.emissions.by.model.sector.global,
-    h = 500,
-    w = 500,
-    f = here("data", "data_vetting", "figures", "per-model", m, paste0("emissions_global") )
-  )
 }
 
 # World (emissions total)
+# for (m in c("MESSAGE")){
 for (m in model.list.simple){
-  p.data.model <- scenarios_harmonization %>%
-      filter(region=="World") %>% filter_includes("Total") %>% mutate(full.model.name = model) %>% 
-      simplify_model_names() %>%
-      filter(grepl(model, pattern=m, fixed=T)) %>% 
-      iamc_region_keep_one_level(-1) %>% 
-      iamc_variable_keep_one_level(-1)
-  # p.data.hist <- hist.national %>% filter(region=="World") %>% filter_includes("Total") %>% 
-  #       iamc_region_keep_one_level(-1) %>% 
-  #       iamc_variable_keep_one_level(-1)
+  
   p.data.hist <- hist.global.allspecies %>% mutate(variable="Total") %>% 
     reframe(
       value = ifelse(unit == "Mt CO2/yr",
@@ -489,83 +784,51 @@ for (m in model.list.simple){
                      value),
       .by = c("scenario", "region", "variable", "unit", "year")
     ) %>% mutate(model="Composite history")
-  p.emissions.by.model.sector.global <- ggplot(
-    p.data.model,
-    aes(x=year,y=value)
-  ) +
-    facet_wrap(unit~variable, scales="free_y") +
-    geom_line(aes(colour=scenario,
-                  linetype=full.model.name,
-                  group=interaction(full.model.name,scenario,region,variable))) +
-    geom_line(
-      data = p.data.hist,
-      colour = "black"
-    ) +
-    geom_point(
-      data = p.data.hist,
-      colour = "black",
-      aes(shape = model)
-    ) +
-    theme_jsk() +
-    ylab(NULL) + xlab(NULL) +
-    labs(
-      title = m
-    ) + 
-    mark_history()
-
-
-  dir.create(here("data", "data_vetting", "figures", "per-model", m))
-  save_ggplot(
-    p = p.emissions.by.model.sector.global,
-    h = 500,
-    w = 500,
-    f = here("data", "data_vetting", "figures", "per-model", m, paste0("emissions_global_totals") )
-  )
-}
-
-```
-
-### Regional (all models)
-
-```{r}
-#| echo: false
-2 * 2
-```
-
-The `echo: false` option disables the printing of code (only output is displayed).
-
-### Regional (for each model separately)
-
-```{r}
-
-
-# regional
-for (m in model.list.simple){
-# for (m in c("MESSAGE")){
-for (s in sector.list %>% pull(sector) %>% unique() ){
-  p.data.model <- scenarios_harmonization %>% mutate(full.model.name = model) %>% 
-      simplify_model_names() %>%
-      filter(grepl(model, pattern=m, fixed=T),
-             grepl(region, pattern=m, fixed=T)) %>% 
-      left_join(sector.list) %>% filter(sector==s) %>% 
-      iamc_region_keep_one_level(-1)
-  p.data.hist <- hist.regional %>% filter_region_includes(m) %>% 
-        left_join(sector.list) %>% filter(sector==s) %>% 
-        iamc_region_keep_one_level(-1)
+  p.data.hist.edgar <- hist.national.edgar %>% 
+    filter_includes("Total") %>% 
+    filter(region=="World") %>% 
+    mutate(variable="Total", scenario="historical")
   
-  if (nrow(p.data.model)+nrow(p.data.hist)>0){
-    # plot only if there is data to plot (e.g. no regional data for international shipping / aircraft)
+  for (scenario.set in c("main", "alternative")){
     
-    p.emissions.by.model.sector <- ggplot(
+    if (scenario.set=="main") {s.list <- scenario.list.main} else {s.list <- scenario.list.alternative}
+    p.data.model <- scenarios_harmonization %>%
+      filter_includes("Total") %>% 
+      filter(region=="World",
+             scenario%in%s.list) %>% mutate(full.model.name = model) %>%
+      simplify_model_names() %>%
+      filter(grepl(model, pattern=m, fixed=T))
+    if (nrow(p.data.model)==0){
+      next # skip this iteration if there's no model data (e.g. no alternative scenarios submitted)
+    }
+    p.data.model <- p.data.model %>% 
+      iamc_region_keep_one_level(-1) %>%
+      iamc_variable_keep_one_level(-1)
+    
+    
+    p.emissions.by.model.sector.global <- ggplot(
       p.data.model,
       aes(x=year,y=value)
     ) +
-      facet_grid(unit~region, scales="free_y") +
-      # IAM data
+      facet_wrap(unit~variable, scales="free_y") +
+      
+      # IAM
       geom_line(aes(colour=scenario,
                     linetype=full.model.name,
                     group=interaction(full.model.name,scenario,region,variable))) +
-      # history
+      
+      # EDGAR
+      geom_line(
+        data = p.data.hist.edgar,
+        colour = "darkgrey"
+      ) +
+      geom_point(
+        data = p.data.hist.edgar,
+        colour = "darkgrey",
+        aes(shape = model)
+      ) +
+      
+      # CEDS-GFED
       geom_line(
         data = p.data.hist,
         colour = "black"
@@ -579,22 +842,129 @@ for (s in sector.list %>% pull(sector) %>% unique() ){
       ylab(NULL) + xlab(NULL) +
       labs(
         title = m,
-        subtitle = s 
-      )
+        subtitle = paste0("Scenario set: ", scenario.set)
+      ) + 
+      mark_history()
   
   
     dir.create(here("data", "data_vetting", "figures", "per-model", m))
     save_ggplot(
+      p = p.emissions.by.model.sector.global,
+      h = 500,
+      w = 500,
+      format = "pdf",
+      f = here("data", "data_vetting", "figures", "per-model", m, paste0("emissions_global_totals", "_", scenario.set) )
+    )
+    
+    
+  }
+}
+
+```
+
+### Regional (for each model separately)
+
+```{r}
+
+#' TODO:
+#' - [ ] process data differently when we are looking at sector = 'Total'; this exists for both CEDS and GFED
+
+years.hist.to.highlight <- c(1990,1995,2000,2010,2015,2020,2023)
+
+# regional
+for (m in model.list.simple){
+# for (m in c("MESSAGE")){
+  
+  dir.create(here("data", "data_vetting", "figures", "per-model", m))
+  
+for (s in sector.list %>% pull(sector) %>% unique() ){
+# for (s in c("Total") ){
+  for (scenario.set in c("main", "alternative")){
+    if (scenario.set=="main") {s.list <- scenario.list.main} else {s.list <- scenario.list.alternative}
+    p.data.model <- scenarios_harmonization %>% 
+      filter(scenario%in%s.list)
+    if (nrow(p.data.model)==0){
+      next # skip this iteration if there's no model data (e.g. no alternative scenarios submitted)
+    }
+    p.data.model <- p.data.model %>% 
+      left_join(sector.list) %>% filter(sector==s) %>% 
+      mutate(full.model.name = model) %>% 
+      simplify_model_names() %>%
+      filter_region_includes(m) %>% 
+      iamc_region_keep_one_level(-1)
+    p.data.hist <- hist.regional %>% filter_region_includes(m) %>% 
+        left_join(sector.list) %>% filter(sector==s) %>% 
+        iamc_region_keep_one_level(-1)
+    p.data.hist.edgar <- hist.regional.edgar %>% filter_region_includes(m) %>% 
+        left_join(sector.list) %>% filter(sector==s) %>% 
+        iamc_region_keep_one_level(-1)
+    
+    if (s == "Total"){
+      p.data.hist <- p.data.hist %>% 
+        bind_rows(
+          # add a combined total
+          p.data.hist %>% reframe(model="CEDS+GFED", value=sum(value), .by = c("scenario","region", "variable", "unit", "year", "sector"))
+        )
+    }
+    
+    if (nrow(p.data.model)+nrow(p.data.hist)>0){
+    # plot only if there is data to plot (e.g. no regional data for international shipping / aircraft)
+    
+    p.emissions.by.model.sector <- ggplot(
+      p.data.model,
+      aes(x=year,y=value)
+    ) +
+      facet_grid(unit~region, scales="free_y") +
+      
+      # IAM data
+      geom_line(aes(colour=scenario,
+                    linetype=full.model.name,
+                    group=interaction(model,full.model.name,scenario,region,variable))) +
+      
+      # EDGAR
+      geom_line(
+        data = p.data.hist.edgar,
+        colour = "darkgrey"
+      ) +
+      geom_point(
+        data = p.data.hist.edgar %>% filter(year%in%years.hist.to.highlight),
+        colour = "darkgrey",
+        aes(shape = model)
+      ) +
+      
+      # history
+      geom_line(
+        data = p.data.hist,
+        colour = "black",
+        aes(group=interaction(model,scenario,region,variable))
+      ) +
+      geom_point(
+        data = p.data.hist %>% filter(year%in%years.hist.to.highlight),
+        colour = "black",
+        aes(shape = model)
+      ) +
+      theme_jsk() +
+      ylab(NULL) + xlab(NULL) +
+      labs(
+        title = m,
+        subtitle = paste0(s, "\n", "Scenario set: ", scenario.set) 
+      )
+  
+  
+    
+    save_ggplot(
       p = p.emissions.by.model.sector,
       h = 500,
       w = 500,
-      f = here("data", "data_vetting", "figures", "per-model", m, paste0("emissions_", s) )
+      format = "pdf",
+      f = here("data", "data_vetting", "figures", "per-model", m, paste0("emissions_", s, "_", scenario.set) )
     )
   
   } else {
     print(paste0("Skipping non-existing regional emissions for ", s))
   }
-  
+    
+  }
 }
 }
 
@@ -603,6 +973,36 @@ for (s in sector.list %>% pull(sector) %>% unique() ){
 
 
 ```
+
+# COMBINE PDFS: alignment (history)
+```{r}
+
+# combine all in one pdf
+for (m in model.list.simple){
+  path.model <- here("data", "data_vetting", "figures", "per-model", m)
+  
+  FILES.pdf <- file.path(path.model, dir(path.model, pattern = "*.pdf"))  # get file names
+  
+  OUT_FILE_NAME_MAIN <- file.path(path.model, paste0("vetting_plots_",m,"_main_",Sys.Date(),".pdf"))
+  OUT_FILE_NAME_ALT <- file.path(path.model, paste0("vetting_plots_",m,"_alternative_",Sys.Date(),".pdf"))
+  
+  qpdf::pdf_combine(
+    input = FILES.pdf[((grepl(FILES.pdf, pattern="_main",fixed=T))&!(grepl(FILES.pdf, pattern=OUT_FILE_NAME_MAIN,fixed=T)))],
+    output = OUT_FILE_NAME_MAIN
+  )
+  
+  qpdf::pdf_combine(
+    input = FILES.pdf[((grepl(FILES.pdf, pattern="_alternative",fixed=T))&!(grepl(FILES.pdf, pattern=OUT_FILE_NAME_ALT,fixed=T)))],
+    output = OUT_FILE_NAME_ALT
+  )
+  
+}
+
+
+
+```
+
+
 
 # VARIABLES: Missing sector-species variables (per model, for the "World" region, the 2020 datapoint)
 
@@ -629,13 +1029,14 @@ present.or.not <- present.or.not.template %>%
   ) %>% pivot_wider(
     names_from = species,
     values_from = reported
-  )
+  ) %>% 
+  arrange(model,sector)
 present.or.not
 
-dir.create(here("data", "data_vetting", "figures", "all-models-overview"))
+dir.create(here("data", "data_vetting", "figures", "all-models-overview-20250311"))
 write_delim(
   x = present.or.not,
-  file = here("data", "data_vetting", "figures", "all-models-overview", "variable_reporting.csv"),
+  file = here("data", "data_vetting", "figures", "all-models-overview-20250311", "variable_reporting.csv"),
   delim = ","
 )
 
@@ -651,13 +1052,30 @@ for (m in present.or.not %>% pull(model) %>% unique() ){
   dir.create(here("data", "data_vetting", "figures", "per-model", m.simple))
   write_delim(
     x = present.or.not.per.model,
-    file = here("data", "data_vetting", "figures", "per-model", m.simple, paste0("variable_reporting_",m,".csv")),
+    file = here("data", "data_vetting", "figures", "per-model", m.simple, paste0("variable_reporting_",m,"_20250409.csv")),
     delim = ","
   )
 }
+```
+
+
+```{r}
+bc.oc.ratio <- scenarios %>% filter(variable%in%c("Emissions|BC", "Emissions|OC"),region=="World") %>% select(-unit) %>%  pivot_wider(names_from = variable, values_from = value) %>% mutate(bc.oc.ratio = `Emissions|BC`/`Emissions|OC`)
+
+
+bc.oc.ratio.hist <- hist.global.allspecies %>% filter(variable%in%c("Emissions|BC", "Emissions|OC"),region=="World") %>% select(-unit) %>%  pivot_wider(names_from = variable, values_from = value) %>% mutate(bc.oc.ratio = `Emissions|BC`/`Emissions|OC`)
+
+
+ggplot(bc.oc.ratio, aes(x=year,y=bc.oc.ratio, group=interaction(model,scenario,region), colour=scenario)) + 
+  geom_line() + 
+  geom_point(data = bc.oc.ratio.hist, colour = "black") +
+  labs(title="Emissions|BC / Emissions|OC (World)",y="ratio",x=NULL)
 
 
 ```
+
+
+
 
 # COUNTRIES: Missing countries (per model)
 
@@ -691,7 +1109,7 @@ names(cd.model.list) <- c("AIM",
 for (m in names(cd.model.list)){
   
   df.model.missing.countries <- countries.all.models[, c("iso", "country", cd.model.list[[m]],
-                                                         "R10", "CEDSv2024_07_08", "GFED4.1s")]
+                                                         "R10", "CEDSv_2025_03_11", "GFED4.1s")]
   
   dir.create(here("data", "data_vetting", "figures", "per-model", m))
   write_delim(
@@ -741,7 +1159,7 @@ for (m in (scenarios.global.with.targets %>% pull(model) %>% unique()) ){
     "Emissions|CO2|AFOLU",
     "Emissions|CO2|Energy and Industrial Processes",
     "Emissions|CH4",
-    # "Emissions|CH4|AFOLU", # not in emulator emissions
+    "Emissions|CH4|AFOLU", # not in emulator emissions
     "Emissions|Sulfur",
     
     "Emissions|BC",
@@ -805,7 +1223,7 @@ for (m in (scenarios.global.with.targets %>% pull(model) %>% unique()) ){
     }
   }
 }
-print(ppt, target = here("data", "data_vetting", "figures", "per-model", "compare_with_scenarioMIP_guidance.pptx"))
+print(ppt, target = here("data", "data_vetting", "figures", "per-model", "MESSAGE", "compare_with_scenarioMIP_guidance_20250409.pptx"))
 
 ```
 

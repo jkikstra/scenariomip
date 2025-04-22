@@ -654,7 +654,8 @@ iamc_long_to_wide <- function(df){
   df <- df %>%
     pivot_wider(
       values_from = value,
-      names_from = year
+      names_from = year,
+      values_fn = mean  # or another aggregation function (in case aggregation is needed)
     )
 
   return(df)
