@@ -1,4 +1,40 @@
 
+# step 1: what is zero? (CEDS)
+HARMONIZATION.YEAR <- 2023
+zero.in.ceds <- hist.data.iam.regions %>% filter(year==HARMONIZATION.YEAR,
+                                 grepl(model,pattern="CEDS",fixed=T),
+                                 region=="World") %>%
+  filter(value==0) %>%
+  # distinct(variable)
+  add_sector_and_species_columns() %>%
+  distinct(model,sector,species) %>%
+  mutate(reported_as_zero_in_ceds ="zero_in_ceds") %>%
+  pivot_wider(
+    names_from = species,
+    values_from = reported_as_zero_in_ceds
+  ) %>%
+  arrange(model,sector)
+write_delim(
+  x = zero.in.ceds,
+  file = here("data", "data_vetting", "figures", "vetting-historical-reporting", paste0("variables_zero_in_ceds_", as.character(HARMONIZATION.YEAR), ".csv")),
+  delim = ","
+)
+
+
+
+
+# step 2: distance to CEDS-GFED
+
+# step 3: outside of range of historical data (totals, global)
+#' TODO:
+#' - [ ] add GAINS global totals
+#' - [ ] add CAMS global totals
+
+# step 4: outside of range of historical data (totals per region)
+
+# step 5: outside of range of historical data (totals per region and sector)
+
+
 # # Put all historical data in one dataframe ----
 # # all hist
 # hist.data.iam.regions <-
