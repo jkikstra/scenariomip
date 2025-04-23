@@ -7,7 +7,6 @@
 # step 3: other weird things
 
 # step 4: check zero in CEDS
-HARMONIZATION.YEAR <- 2023
 zero.in.ceds <- hist.data.iam.regions %>% filter(year==HARMONIZATION.YEAR,
                                                  grepl(model,pattern="CEDS",fixed=T),
                                                  region=="World") %>%
@@ -27,10 +26,9 @@ write_delim(
   delim = ","
 )
 
+
 # step 5: model-specific coverage of species-sector space
 
-
-# OLD implementation ----
 present.or.not.template <- expand_grid(
   model.list,
   sector.species.list

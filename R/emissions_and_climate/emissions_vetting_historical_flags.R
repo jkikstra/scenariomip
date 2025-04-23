@@ -1,26 +1,7 @@
 
-# step 1: what is zero? (CEDS)
-HARMONIZATION.YEAR <- 2023
-zero.in.ceds <- hist.data.iam.regions %>% filter(year==HARMONIZATION.YEAR,
-                                 grepl(model,pattern="CEDS",fixed=T),
-                                 region=="World") %>%
-  filter(value==0) %>%
-  # distinct(variable)
-  add_sector_and_species_columns() %>%
-  distinct(model,sector,species) %>%
-  mutate(reported_as_zero_in_ceds ="zero_in_ceds") %>%
-  pivot_wider(
-    names_from = species,
-    values_from = reported_as_zero_in_ceds
-  ) %>%
-  arrange(model,sector)
-write_delim(
-  x = zero.in.ceds,
-  file = here("data", "data_vetting", "figures", "vetting-historical-reporting", paste0("variables_zero_in_ceds_", as.character(HARMONIZATION.YEAR), ".csv")),
-  delim = ","
-)
-
-
+# step 1: what is non-zero but should have been? (CEDS)
+# -> creating overview is covered in emissions_check_reporting_completeness
+# -> here: check what is non-zero but should have been zero
 
 
 # step 2: distance to CEDS-GFED

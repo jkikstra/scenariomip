@@ -1,3 +1,6 @@
+#' TODO
+#' - [ ] Create CEDS+GFED totals
+
 # File names ----
 
 ## Harmonization ----
@@ -88,3 +91,6 @@ write_delim(
   delim = ","
 )
 
+
+# Create CEDS+GFED totals ----
+# tbd.

@@ -27,6 +27,8 @@ output.folder.data <- here("data", "data_vetting", "output_data")
 # source(here("download_scenarios.R"))
 DOWNLOAD.DATE <- "2025-04-16"
 
+# Other shared parameters
+HARMONIZATION.YEAR <- 2023
 
 # load functions
 source(here("R", "emissions_and_climate", "emissions_utils.R"))
