@@ -32,7 +32,8 @@ HARMONIZATION.YEAR <- 2023
 
 # load functions
 source(here("R", "emissions_and_climate", "emissions_utils.R"))
-
+# load other
+source(here("R", "visualisation_choices.R"))
 
 # Load and aggregate scenario data
 MESSAGE.INTERNAL.OR.SCEN.EXPL <- "scenario_explorer" # "internal" # for `emissions_load_scenarios.R`
@@ -47,6 +48,7 @@ if (file.exists(
     iamc_wide_to_long()
 } else {
   source(here("R", "emissions_and_climate", "emissions_load_scenarios.R"))
+  source(here("R", "emissions_and_climate", "emissions_aggregation_rules_scenarios.R"))
   source(here("R", "emissions_and_climate", "emissions_aggregate_scenarios_to_harmonization_sector.R"))
 }
 
@@ -70,7 +72,14 @@ source(here("R", "emissions_and_climate", "emissions_vetting_historical_flags.R"
 source(here("R", "emissions_and_climate", "emissions_vetting_historical_plots.R"))
 
 # Future - Plotting: climate
-source(here("R", "emissions_and_climate", "climate_future_plotting.R"))
+CLIMATE.DATA.LOCATION <- here("data", "data_vetting", "climate")
+AR6.CLIMATE.FILE.JSK <- "scenarios_scenariomip_emissions_global_2025-04-16_alloutput.xlsx"
+AR6.CLIMATE.FOLDER.ZN <- file.path(CLIMATE.DATA.LOCATION, "0020_20250416-112220_ar6-workflow")
+AR6.CLIMATE.FOLDER.ZN.OUTPUT <- file.path(AR6.CLIMATE.FOLDER.ZN, "magicc-ar6")
+CMIP7.CLIMATE.FOLDER.ZN <- file.path(CLIMATE.DATA.LOCATION, "0020_20250416-112220_updated-workflow")
+CMIP7.CLIMATE.FOLDER.ZN.OUTPUT <- file.path(CMIP7.CLIMATE.FOLDER.ZN, "magicc-v7-6-0a3_magicc-ar7-fast-track-drawnset-v0-3-0")
+source(here("R", "emissions_and_climate", "climate_ar6workflow_jsk.R"))
+# source(here("R", "emissions_and_climate", "climate_cmip7workflow_zn.R")))
 
 # Future - Plotting: emissions
 source(here("R", "emissions_and_climate", "emissions_future_plotting.R"))
