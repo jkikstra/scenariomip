@@ -193,16 +193,11 @@ add_sector_and_species_columns <- function(df){
 
 # Industrial sector: create aggregate sector
 
-process_industry <- function(df){
+process_industry <- function(df, vars.to.aggregate = INDUSTRY.SECTOR.VARIABLES){
 
   industrial_sector_data <- df %>%
     filter(
-      sector %in% c(
-        "Energy|Demand|Industry",
-        "Energy|Demand|Other Sector",
-        "Industrial Processes",
-        "Other"
-      )
+      sector %in% vars.to.aggregate
     )
   industrial_sector_data <- industrial_sector_data %>%
     reframe(
@@ -219,15 +214,12 @@ process_industry <- function(df){
 
 }
 
-process_aircraft <- function(df){
+process_aircraft <- function(df, vars.to.aggregate = INDUSTRY.SECTOR.VARIABLES){
 
   # Aircraft: create aggregate (intl + domestic) sector
   aircraft_sector_data <- df %>%
     filter(
-      sector %in% c(
-        "Energy|Demand|Bunkers|International Aviation",
-        "Energy|Demand|Transportation|Domestic Aviation"
-      )
+      sector %in% vars.to.aggregate
     )
   aircraft_sector_data <- aircraft_sector_data %>%
     # sum aircraft sectors
@@ -250,6 +242,8 @@ process_aircraft <- function(df){
 }
 
 process_transport <- function(df){
+  #' TODO:
+  #' - [ ] improve this function by allowing for changing the variable names (TRANSPORT.SECTOR.VARIABLES.positive, TRANSPORT.SECTOR.negative)
 
   # Transportation: subtract domestic aviation
   transport_sector_data <- scenarios_harmonization %>%
@@ -281,17 +275,11 @@ process_transport <- function(df){
 
 }
 
-process_agriculture <- function(df){
+process_agriculture <- function(df, vars.to.aggregate = AGRICULTURE.SECTOR.VARIABLES){
 
   agriculture_sector_data <- df %>%
     filter(
-      sector %in% c(
-        "AFOLU|Agriculture",
-        "AFOLU|Land|Harvested Wood Products",
-        "AFOLU|Land|Land Use and Land-Use Change",
-        "AFOLU|Land|Other",
-        "AFOLU|Land|Wetlands"
-      )
+      sector %in% vars.to.aggregate
     )
   agriculture_sector_data <- agriculture_sector_data %>%
     reframe(
