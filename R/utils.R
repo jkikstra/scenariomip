@@ -904,6 +904,132 @@ MS_add <- function(df){
     df %>% mutate(`Model-Scenario`=paste0(Model,"-",Scenario))
   )
 }
+
+
+##### Emissions calculation tools ----------------------------------------------
+
+#' Estimate the Year When a Value Crosses Zero
+#'
+#' This function estimates the year when a specified column (`value_col`) crosses zero
+#' for each combination of grouping columns (`group_cols`). Two methods are available:
+#' returning the first year before the reported crossing year ("before-reported-model-year")
+#' or estimating the crossing year using linear interpolation ("linear-interpolation").
+#'
+#' @param df A data frame containing the data to analyze.
+#' @param value_col A string specifying the column name containing the values to check for zero-crossing. Default is `"value"`.
+#' @param year_col A string specifying the column name containing the years. Default is `"year"`.
+#' @param group_cols A vector of strings specifying the columns that define groups, typically `"model"` and `"scenario"`.
+#' @param mode A string specifying the estimation method. Options are:
+#'   - `"before-reported-model-year"`: Returns the year before the zero-crossing.
+#'   - `"linear-interpolation"`: Uses linear interpolation to estimate the exact year of crossing.
+#'   Default is `"linear-interpolation"`.
+#' @param threshold_value A numeric value specifying the threshold for which the crossing is investigated. Default is `0`.
+#'
+#' @return A data frame containing the group columns and the estimated crossing year.
+#'   The output varies depending on the selected `mode`:
+#'   - For `"before-reported-model-year"`, the output contains the first year before the crossing.
+#'   - For `"linear-interpolation"`, the output contains interpolated years.
+#'
+#' @examples
+#' # Example dataset
+#' df <- data.frame(
+#'   model = c("A", "A", "A", "B", "B", "B"),
+#'   scenario = c("X", "X", "X", "Y", "Y", "Y"),
+#'   year = c(2020, 2021, 2022, 2020, 2021, 2022),
+#'   value = c(-1, 0.5, 1.5, 2, -1, -2)
+#' )
+#'
+#' # Estimate crossing year with default mode
+#' estimate_crossing_year(df, mode = "before-reported-model-year")
+#'
+#' # Estimate crossing year with linear interpolation
+#' estimate_crossing_year(df)
+#'
+#' @import dplyr
+#' @export
+estimate_crossing_year <- function(data, value_col = "value", year_col = "year", group_cols = c("model", "scenario"),
+                                   mode = "linear-interpolation",
+                                   threshold_value = 0,
+                                   drop.groups = "drop") {
+  # Ensure the columns exist
+  stopifnot(all(c(value_col, year_col, group_cols) %in% colnames(data)))
+
+  # Apply the threshold
+  data <- data %>% mutate(value = value - threshold_value)
+
+  # Convert character column names to symbols
+  group_syms <- rlang::syms(group_cols)
+
+  if (mode == "before-reported-model-year") {
+    # Identify the first year before a crossing occurs
+    crossing_years <- data %>%
+      arrange(!!!group_syms, .data[[year_col]]) %>% # Use symbols for grouping
+      group_by(!!!group_syms) %>%
+      mutate(sign_change = sign(.data[[value_col]]) != lag(sign(.data[[value_col]]))) %>% # Detect sign change
+      filter(!is.na(sign_change) & sign_change) %>% # Remove NA and keep rows with a sign change
+      slice_head(n = 1) %>% # Get the first crossing for each group
+      summarise(crossing_year = first(.data[[year_col]]), .groups = drop.groups) # Report the first year with a sign change
+
+  } else if (mode == "linear-interpolation") {
+    # Use linear interpolation to estimate the crossing year
+    crossing_years <- data %>%
+      arrange(!!!group_syms, .data[[year_col]]) %>% # Use symbols for grouping
+      group_by(!!!group_syms) %>%
+      mutate(
+        sign_prev = lag(sign(.data[[value_col]])), # Previous sign
+        year_prev = lag(.data[[year_col]]),       # Previous year
+        value_prev = lag(.data[[value_col]])      # Previous value
+      ) %>%
+      filter(!is.na(sign_prev) & sign(.data[[value_col]]) != sign_prev) %>% # Keep sign changes
+      reframe(
+        crossing_year = year_prev + (.data[[year_col]] - year_prev) * abs(value_prev) /
+          (abs(value_prev) + abs(.data[[value_col]])),
+        !!!group_syms # Include group columns in the result
+      )
+  } else {
+    stop("Invalid mode specified. Choose 'before-reported-model-year' or 'linear-interpolation'.")
+  }
+
+  return(crossing_years)
+}
+
+estimate_net_zero <- function(df, var="Emissions|CO2", region="World",
+                              mode = "only-linear-interpolation",
+                              rounding_year=TRUE,
+                              keep_only_first_crossing_year=FALSE,
+                              ...){
+  df <- df %>% filter(variable==var, region=="World")
+
+  if (mode=="only-linear-interpolation"){
+    out <- estimate_crossing_year(df, ...) %>% mutate(mode="linear-interpolation") %>%
+      mutate(variable = var)
+  } else if (mode=="only-before-reported-model-year"){
+    out <- estimate_crossing_year(df, mode="before-reported-model-year", ...) %>% mutate(mode="before-reported-model-year") %>%
+      mutate(variable = var)
+  } else if (mode=="all-methods"){
+    out <- estimate_crossing_year(df, ...) %>% mutate(mode="linear-interpolation") %>%
+      bind_rows(estimate_crossing_year(df, mode = "before-reported-model-year", ...) %>% mutate(mode="before-reported-model-year")) %>%
+      mutate(variable = var)
+  }
+
+  # clean up
+  out <- out %>% rename(net_zero_year = crossing_year)
+  if (rounding_year == TRUE){
+    out <- out %>% mutate(net_zero_year = round(net_zero_year))
+  }
+
+  # in case there is a double crossing, remove it (if so desired):
+  if (keep_only_first_crossing_year){
+    out <- out %>% arrange(model,scenario,net_zero_year,mode,variable) %>%
+      reframe(
+        net_zero_year = first(net_zero_year),
+        .by = c("model","scenario","mode","variable")
+      )
+  }
+
+  return(out)
+}
+
 ##### Climate assessment tools -------------------------------------------------
 add_emissions_processing_col <- function(df) {
 
