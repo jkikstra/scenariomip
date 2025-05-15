@@ -1,6 +1,8 @@
 # do subsectors, used for scenarioMIP, like Emissions|CO2|*, add up to the total Emissions|CO2?
 
 # Emissions|CO2 {original} == sum(Emissions|CO2|*) {original} ----
+# - generally, numerical issues
+# - often model results right now don't add up perfectly, especially CO2 (land) creates issues.
 aggregation.issues <- NULL
 for (e in EMISSIONS.SPECIES.SECTORAL){
   totals.original <- scenarios %>% filter(variable == paste0("Emissions|",e)) %>%
@@ -35,6 +37,7 @@ write_delim(x = data.frame(variable=SECTOR.VARIABLES.ALL),
             delim = ",")
 
 # Emissions|CO2 {original} == Emissions|CO2|Total {harmonized} ----
+# - expected to be fine
 aggregation.issues <- NULL
 for (e in EMISSIONS.SPECIES.SECTORAL){
   totals.original <- scenarios %>% filter(variable == paste0("Emissions|",e)) %>%

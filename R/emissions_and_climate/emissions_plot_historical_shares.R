@@ -32,6 +32,11 @@ save_ggplot(
   format = "pdf",
   f = file.path(path.model.out, paste0("CEDS_sector_shares_", as.character(HARMONIZATION.YEAR)) )
 )
+write_delim(
+  x = global.ceds.sector.shares,
+  file = file.path(path.model.out, paste0("CEDS_sector_shares_", as.character(HARMONIZATION.YEAR), ".csv") ),
+  delim = ","
+)
 
 
 # step 2: shares by sector (countries) - CEDS

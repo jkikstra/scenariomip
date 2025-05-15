@@ -1,7 +1,17 @@
 
 
 # load scenario data ----
-scenarios <- load_csv_iamc(file.path(IAM_SCENARIOS_LOCATION, IAM_SCENARIOS_FILE), mode="fast")
+if (MESSAGE.INTERNAL.OR.SCEN.EXPL=="internal"){
+  scenarios <- load_csv_iamc(file.path(IAM_SCENARIOS_LOCATION, "SSP_SSP2_v4.0.1_SSP2 - Low Emissions.csv"), mode="fast") %>%
+    bind_rows(
+      load_excel_iamc(
+        file.path(IAM_SCENARIOS_LOCATION, "SSP_SSP3_v5.2_baseline_1000f.xlsx")
+      )
+    )
+} else {
+  scenarios <- load_csv_iamc(file.path(IAM_SCENARIOS_LOCATION, IAM_SCENARIOS_FILE), mode="fast")
+}
+
 # only keep emissions data
 scenarios <- scenarios %>%
   filter(str_starts(Variable, "Emissions"))
