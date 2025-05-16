@@ -331,9 +331,20 @@ add_scenariomip_info_columns <- function(df){
 
 ## Load data -------------------------------------------------------------------
 
+### Preferenecs ----------------------------------------------------------------
+preferences <- read_excel(path = file.path(MARKER.ANALYSIS.FOLDER, "preferences",
+                                           "20251605_MarkerPriorities.xlsx"),
+                          sheet = "data") %>%
+  pivot_longer(
+    cols = -model,
+    names_to = "target",
+    values_to = "priority"
+  ) %>%
+  simplify_model_names(keep.full.model.name = F)
+
 ### IAM data -------------------------------------------------------------------
 
-#### Emissions ------------------------------------------------------------------
+#### Emissions -----------------------------------------------------------------
 emissions <- load_csv_iamc(file.path(MARKER.ANALYSIS.FOLDER, "emissions",
                                 "scenarios_scenariomip_emissions_2025-05-06.csv"),
                            mode = "fast") %>%
@@ -344,6 +355,9 @@ emissions <- load_csv_iamc(file.path(MARKER.ANALYSIS.FOLDER, "emissions",
   add_scenariomip_info_columns()
 
 emissions.regional <- NA
+
+#### Emissions (harmonized) ----------------------------------------------------
+# Download from: https://iiasahub.sharepoint.com/sites/eceprog/Shared%20Documents/Forms/AllItems.aspx?FolderCTID=0x012000AA9481BF7BE9264E85B14105F7F082FF&id=%2Fsites%2Feceprog%2FShared%20Documents%2FProjects%2FCMIP7%2FIAM%20Data%20Processing%2FScenarioMIP%20Emulator%20workflow%2FApril%2011%20submission%2Fscm%2Doutput%2F0005%5F0002%5F0002%5F0002%5F0002%5F0002%5F0003%5F0002%5F0002%5F0002%5F0002%5F95b5f2c9fb62e32a4d08fe2ffc5b4a6ff246ad2d%5F0003%5F0003%5F0002
 
 #### Primary Energy Biomass ----------------------------------------------------
 # pe.biomass <- load_csv_iamc(file.path(MARKER.ANALYSIS.FOLDER, "emissions",
@@ -396,22 +410,43 @@ write_delim(
 ##### Load percentiles ---------------------------------------------------------
 climate.timeseries <- read_csv(
   file.path(PATH.CLIMATE.DATA, "20250510_magicc_percentiles.csv")
-)
+) %>%
+  add_scenariomip_info_columns()
+
+
+climate.timeseries %>% filter(target=="M",
+                              climate_model=="MAGICCv7.6.0a3",
+                              variable=="Surface Air Temperature Change",
+                              percentile=="p50") %>%
+  plot_standard_line_one_region()
+
 
 
 ## Load filters ----------------------------------------------------------------
 
 scenario.list <- warming %>% distinct(model,scenario)
 
-### Emissions ------------------------------------------------------------------
 
+#' NOTE: THINGS DONE TO KEEP A FEW MORE OPTIONS [enabling team's priority 1 target markers]:
+#' 1. EOC GHGs up to 8Gt away from NZ allowed to keep MESSAGE L SSP2 in
+#' 2. Max. net-negative CO2 to -10e3 instead of -7e3 to keep REMIND VLLO in
+#' 3. VLLO peak temp (p33<1.62) -> should aim to go down towards as close as 1.5 as possible
+#'
+#' ...
+#' ...
 
-filter_criteria <- function(df.emissions,df.warming,df.categories,strictness="strict"){
+filter_criteria <- function(df.emissions,
+                            df.warming,
+                            df.categories,
+                            df.climate.timeseries,
+                            allowance.strictness="strict"){
 
-  if (strictness=="strict"){
+  if (allowance.strictness=="strict"){
 
-    allowance.ghg <- 2e3 # MtCO2eq allowance
-    allowance.co2 <- 2e3 # MtCO2 allowance
+    allowance.ghg <- 2e3 # MtCO2eq allowance (should eventually go to zero?)
+    allowance.co2 <- 2e3 # MtCO2 allowance (should eventually go to zero?)
+
+    allowance.nz.co2 <- 1.5e3 # should eventually go to 200 MtCO2 to be considered net-zero CO2
 
     allowance.temp <- 0.075 # in K; to other function?
 
@@ -420,24 +455,44 @@ filter_criteria <- function(df.emissions,df.warming,df.categories,strictness="st
 
   # apply filters
 
+  ### H ----
   #' H
   #' Description
   #' - plausible highest emissions trajectory
   #' Quantification
-  #' - no quantification (not defensible as criterion)
+  #' - no quantification (emissions here are not defensible as a criterion)
+  h <- df.emissions %>% filter(target=="H") %>%
+    group_by(model,scenario) %>%
+    summarise(
+      criteria = 1, # no emissions or climate related filters for H, as this is a research question
+      .groups = "drop"
+    )
 
+  ### M ----
   #' M
   #' Description
   #' - flat line, with a certain temperature outcome
   #' Quantification
   #' - 40 < GHG < 70 (at any point in time)
   #'
+  m.ghg <- df.emissions %>% filter(year<=2100,variable=="Emissions|Kyoto Gases",target=="M") %>%
+    group_by(model,scenario) %>%
+    summarise(
+      criteria.emissions.ghg = if (any(value <= 40e3)|any(value >= 70e3)) 0 else 1,
+      .groups = "drop"
+    )
+  m <- m.ghg %>%
+    mutate(criteria = pmin(criteria.emissions.ghg,
+                           na.rm = T))
 
+  ### ML ----
   #' ML
+  #' Quantification
   #' - no negative GHG before 2100
   #' - near-zero CO2 in 2100 (+-2GtCO2)
-  #' - current policies until 2040 (NOT ASSESSED) - medium group will assess; will need some allowance, too
   #' - Temperature should start to stabilise (NOT ASSESSED YET)
+  #' - current policies until 2040 (NOT ASSESSED) - medium group will assess; will need some allowance, too
+  #'
   ml.ghg <- df.emissions %>% filter(year<=2100,variable=="Emissions|Kyoto Gases",target=="ML") %>%
     group_by(model,scenario) %>%
     summarise(
@@ -452,31 +507,67 @@ filter_criteria <- function(df.emissions,df.warming,df.categories,strictness="st
       criteria.emissions.co2 = if ((abs(value) < allowance.co2)) 1 else 0,
       .groups = "drop"
     )
-  ml <- ml.co2 %>% left_join(ml.ghg) %>%
+  ml.temp <- df.climate.timeseries %>% filter(target=="ML",
+                                          climate_model=="MAGICCv7.6.0a3",
+                                          variable=="Surface Air Temperature Change",
+                                          percentile=="p50",
+                                          year%in%c(2090,2100)) %>%
+    iamc_long_to_wide() %>%
+    group_by(model,scenario) %>%
+    summarise(
+      criteria.temp.stabilisation = if ((abs(`2100`-`2090`) < 0.075)) 1 else 0,
+      .groups = "drop"
+    )
+  ml <- ml.co2 %>% left_join(ml.ghg) %>% left_join(ml.temp) %>%
     mutate(criteria = pmin(criteria.emissions.co2,
-                           criteria.emissions.ghg))
+                           criteria.emissions.ghg,
+                           criteria.temp.stabilisation,
+                           na.rm = T))
 
-  # apply filters
+  ### L ----
   #' L
-  #' - no net-zero GHG before 2090
-  #' - 2100 p50 temp 1.65C or higher (no allowance)
-  #' - 2100 p67 temp 2C or low (with small allowance; 0.05K )
+  #' - no net-zero GHG before 2080 (too early)
+  #' - close to net-zero GHG in 2100 (less than +-5GtCO2eq) # NOTE CURRENTLY IMPLEMENTED AS 8 Gt, THIS SHOULD GO DOWN
+  #' - net-zero CO2 around 2070 (2065-2075)
+  #' - higher than VLLO: 2100 p50 temp 1.65C or higher (no allowance)
+  #' - likely below 2C: 2100 p67 temp 2C or low (with small allowance; 0.05K)
+  #'
+  #' Not assessed:
+  #' - needs to be C3 (NOT ASSESSED DIRECTLY - too tight right now to do directly)
   #'
   #' Notes:
   #' - is likely 2C scenario; thus C3, net-zero GHG
   #' Add:
-  #' - add net-zero CO2 around 2070 (2065-2075)
-  #' - needs to be C3
   #'
-  l.scens.ghg <- df.emissions %>% filter(variable=="Emissions|Kyoto Gases",target=="L") %>% distinct(model,scenario)
-  l.ghg.nz <- df.emissions %>% filter(variable=="Emissions|Kyoto Gases",target=="L") %>%
-    estimate_net_zero(var = "Emissions|Kyoto Gases",keep_only_first_crossing_year = T) %>%
+  #'
+  #'
+  l.ghg.nz.time <- df.emissions %>% filter(variable=="Emissions|Kyoto Gases",target=="L") %>%
+    estimate_net_zero(var = "Emissions|Kyoto Gases",keep_only_first_crossing_year = T,
+                      threshold_value = allowance.nz.co2) %>%
     group_by(model,scenario) %>%
     summarise(
-      criteria.emissions.ghg.nz = if ((net_zero_year <= 2090)) 0 else 1,
+      criteria.emissions.ghg.nz.time = if ((net_zero_year <= 2080)) 0 else 1,
       .groups = "drop"
     )
-  l.ghg.nz <- l.scens.ghg %>% left_join(l.ghg.nz) %>% mutate_cond(is.na(criteria.emissions.ghg.nz), criteria.emissions.ghg.nz=1) # no net-zero at all before 2100
+  l.ghg.nz.time <- df.emissions %>% filter(variable=="Emissions|Kyoto Gases",target=="L") %>%
+    distinct(model,scenario) %>%
+    left_join(l.ghg.nz.time) %>%
+    mutate_cond(is.na(criteria.emissions.ghg.nz.time),
+                criteria.emissions.ghg.nz.time=1) # no net-zero at all before 2100 is not before 2080
+  l.ghg.eoc.nz <- df.emissions %>% filter(variable=="Emissions|Kyoto Gases",target=="L",year==2100) %>%
+    group_by(model,scenario) %>%
+    summarise(
+      criteria.emissions.ghg.nz.eoc = if ((abs(value) <= 8e3)) 1 else 0,
+      .groups = "drop"
+    )
+  l.co2.nz <- df.emissions %>% filter(variable=="Emissions|CO2",target=="L") %>%
+    estimate_net_zero(var = "Emissions|CO2",keep_only_first_crossing_year = T,
+                      threshold_value = allowance.nz.co2) %>%
+    group_by(model,scenario) %>%
+    summarise(
+      criteria.emissions.co2.nz = if ((net_zero_year >= 2065)&(net_zero_year <= 2075)) 1 else 0,
+      .groups = "drop"
+    )
   l.eoc.p50 <- df.warming %>% filter(quantile==0.5,metric=="2100",target=="L") %>%
     group_by(model,scenario) %>%
     summarise(
@@ -486,64 +577,90 @@ filter_criteria <- function(df.emissions,df.warming,df.categories,strictness="st
   l.eoc.p67 <- df.warming %>% filter(quantile==0.67,metric=="max",target=="L") %>%
     group_by(model,scenario) %>%
     summarise(
-      criteria.climate.eoc.p67 = if ((value <= 2 + allowance.temp)) 1 else 0,
+      criteria.climate.eoc.p67 = if ((value <= 2 + 0.05)) 1 else 0,
       .groups = "drop"
     )
 
-  l <- l.ghg.nz %>% left_join(l.eoc.p50) %>% left_join(l.eoc.p67) %>%
-    mutate(criteria = pmin(criteria.emissions.ghg.nz,
+  l <- l.ghg.nz.time %>% left_join(l.ghg.eoc.nz) %>% left_join(l.co2.nz) %>% left_join(l.eoc.p50) %>% left_join(l.eoc.p67) %>%
+    mutate(criteria = pmin(criteria.emissions.ghg.nz.time,
+                           criteria.emissions.ghg.nz.eoc,
+                           criteria.emissions.co2.nz,
                            criteria.climate.eoc.p50,
-                           criteria.climate.eoc.p67))
+                           criteria.climate.eoc.p67,
+                           na.rm = T))
 
-
+  ### VLHO ----
   #' VLHO
-  #' - peak temp p33 > ~1.65C (higher than VLLO peak)
+  #' Quantifications:
+  #' - peak p33 temp minimum > 1.64C (0.15 higher than optimal VLLO peak, which we assume should be around 1.5, noting that diff between p33 and p50 peaks is about 0.14K)
+  #' - peak p50 temp minimum > 1.75C (~1.6 of desired VLLO peak + desired diff of at least 0.15K)
   #' - GHG strongly negative in 2100 (<-15GtCO2eq ~ -13 effectively)
   #' - NZ GHG between 2060 and 2080
-  #' - ...
   #'
-  #' TODO:
-  #' - add p50 peak as minimum (1.6+diff) ...
-  #'
-  vlho.peak <- df.warming %>% filter(quantile==0.33,metric=="max",target=="VLHO") %>%
+  vlho.peak.p33 <- df.warming %>% filter(quantile==0.33,metric=="max",target=="VLHO") %>%
     group_by(model,scenario) %>%
     summarise(
-      criteria.climate.peak = if ((value >= 1.5 + allowance.temp + 0.15)|(value <= 1.5 - allowance.temp + 0.15)) 0 else 1,
+      criteria.climate.peak.p33 = if ((value >= 1.5 + 0.14)) 1 else 0,
+      .groups = "drop"
+    )
+  vlho.peak.p50 <- df.warming %>% filter(quantile==0.50,metric=="max",target=="VLHO") %>%
+    group_by(model,scenario) %>%
+    summarise(
+      criteria.climate.peak.p50 = if ((value >= 1.6 + 0.15)) 1 else 0,
       .groups = "drop"
     )
   vlho.ghg.neg <- df.emissions %>% filter(year==2100,variable=="Emissions|Kyoto Gases",target=="VLHO") %>%
     group_by(model,scenario) %>%
     summarise(
-      criteria.emissions.ghg.neg = if (value < -15e3 + allowance.ghg) 1 else 0,
+      criteria.emissions.ghg.neg = if (value < -13e3 + allowance.ghg) 1 else 0,
       .groups = "drop"
     )
   vlho.ghg.nz <- df.emissions %>% filter(variable=="Emissions|Kyoto Gases",target=="VLHO") %>%
-    estimate_net_zero(var = "Emissions|Kyoto Gases") %>%
+    estimate_net_zero(var = "Emissions|Kyoto Gases",keep_only_first_crossing_year = T,
+                      threshold_value = allowance.nz.co2) %>%
     group_by(model,scenario) %>%
     summarise(
       criteria.emissions.ghg.nz = if ((net_zero_year >= 2060) & (net_zero_year <= 2080)) 1 else 0,
       .groups = "drop"
     )
 
-  vlho <- vlho.peak %>% left_join(vlho.ghg.neg) %>% left_join(vlho.ghg.nz) %>%
-    mutate(criteria = pmin(criteria.climate.peak,
+  vlho <- vlho.peak.p33 %>% left_join(vlho.peak.p50) %>% left_join(vlho.ghg.neg) %>% left_join(vlho.ghg.nz) %>%
+    mutate(criteria = pmin(criteria.climate.peak.p33,
                            criteria.emissions.ghg.neg,
-                           criteria.emissions.ghg.nz))
+                           criteria.emissions.ghg.nz,
+                           na.rm = T))
+  #' info: how much are 0.33 and 0.55 different?
+  #' in VLLO and VLHO they are different by about 0.11-0.18K
+  #' - VLLO: 0.135 mean
+  #' - VLHO: 0.147 mean
+  #' so, we use:
+  #' => 0.14K
+  # df.warming %>% filter(quantile%in%c(0.33,0.50),metric=="max",target%in%c("VLLO","VLHO")) %>%
+  #   pivot_wider(names_from = quantile,
+  #               values_from=value) %>%
+  #   mutate(diff=as.numeric(`0.5`)-as.numeric(`0.33`)) %>%
+  #   reframe(
+  #     diff.mean = mean(diff),
+  #     .by = c("target")
+  #   )
 
+
+  ### VLLO ----
   #' VLLO
-  #' - low peak temp (p33<1.6)
-  #' - C1 category (NOT ASSESSED)
+  #' Quantifications
+  #' - low peak temp (p33<1.62) # should aim to go down towards as close as 1.5 as possible
   #' - CO2 net-zero latest 2055
-  #' - CO2 negative latest 2065 (NOT ASSESSED)
   #' - GHG net-zero around 2070
-  #' - residual emissions: CO2 not too negative (7Gt) at any point in time
+  #' - residual emissions: CO2 not too negative (at most -7Gt) at any point in time [not more negative than -7 CO2 -- ENGAGE had net-negative 5-10, 5 means 90% reductions and 10% offset]
   #' - GHG still net-zero (not too negative) in 2100 (NOT ASSESSED)
   #' - primary energy|biomass lower than 100 EJ (NOT ASSESSED)
   #' - demand-side: Final Energy lower than 450EJ/yr? (NOT ASSESSED)
   #'
+  #' Not assessed:
+  #' - C1 category (NOT ASSESSED DIRECTLY - too tight right now to do directly)
+  #'
   #' check/add
-  #' - negative co2; not more negative than -7 CO2 -- ENGAGE had net-negative 5-10, 5 means 90% reductions and 10% offset
-  #' - gross emissions (residual emissions)
+  #' - gross emissions (residual emissions): not higher than 7 GtCO2 after 2060
   #'
   #' Question:
   #' - is Land negative emissions acceptable if land sustainability criteria are met? Probably not for a marker because it raises questions on residual emissions.
@@ -551,18 +668,20 @@ filter_criteria <- function(df.emissions,df.warming,df.categories,strictness="st
   vllo.peak <- df.warming %>% filter(quantile==0.33,metric=="max",target=="VLLO") %>%
     group_by(model,scenario) %>%
     summarise(
-      criteria.climate.peak = if (value <= 1.6 ) 1 else 0,
+      criteria.climate.peak = if (value <= 1.62) 1 else 0,
       .groups = "drop"
     )
   vllo.co2.nz <- df.emissions %>% filter(variable=="Emissions|CO2",target=="VLLO") %>%
-    estimate_net_zero(var = "Emissions|CO2", keep_only_first_crossing_year = T) %>%
+    estimate_net_zero(var = "Emissions|CO2", keep_only_first_crossing_year = T,
+                      threshold_value = allowance.nz.co2) %>%
     group_by(model,scenario) %>%
     summarise(
       criteria.emissions.co2.nz = if ((net_zero_year <= 2055)) 1 else 0,
       .groups = "drop"
     )
   vllo.ghg.nz <- df.emissions %>% filter(variable=="Emissions|Kyoto Gases",target=="VLLO") %>%
-    estimate_net_zero(var = "Emissions|Kyoto Gases", keep_only_first_crossing_year = T) %>%
+    estimate_net_zero(var = "Emissions|Kyoto Gases", keep_only_first_crossing_year = T,
+                      threshold_value = allowance.nz.co2) %>%
     group_by(model,scenario) %>%
     summarise(
       criteria.emissions.ghg.nz = if ((net_zero_year >= 2055) & (net_zero_year <= 2080)) 1 else 0,
@@ -577,17 +696,18 @@ filter_criteria <- function(df.emissions,df.warming,df.categories,strictness="st
   vllo.co2.negative <- df.emissions %>% filter(year<=2100,variable=="Emissions|CO2",target=="VLLO") %>%
     group_by(model,scenario) %>%
     summarise(
-      criteria.emissions.co2.negative = if (any(value < -7e3)) 0 else 1,
+      criteria.emissions.co2.negative = if (any(value < -10e3)) 0 else 1, # NOTE: SHOULD ACTUALLY BE -7e3 !!!
       .groups = "drop"
     )
   vllo <- vllo.peak %>% left_join(vllo.co2.nz) %>% left_join(vllo.ghg.nz) %>% left_join(vllo.co2.negative) %>%
     mutate(criteria = pmin(criteria.climate.peak,
                            criteria.emissions.co2.nz,
                            criteria.emissions.ghg.nz,
-                           criteria.emissions.co2.negative))
+                           criteria.emissions.co2.negative,
+                           na.rm = T))
 
   # combine targets
-  df.scen.list <- ml %>% bind_rows(l) %>% bind_rows(vlho) %>% bind_rows(vllo) %>%
+  df.scen.list <- h %>% bind_rows(m) %>% bind_rows(ml) %>% bind_rows(l) %>% bind_rows(vlho) %>% bind_rows(vllo) %>%
     select(model,scenario,criteria,everything()) %>%
     add_scenariomip_targets_to_IAM_scenarios() %>%
     add_ssp_basis_to_IAM_scenarios()
@@ -595,22 +715,26 @@ filter_criteria <- function(df.emissions,df.warming,df.categories,strictness="st
   return(df.scen.list)
 }
 
-# full.scenario.list <- emissions %>% distinct(model,scenario)
-#
-# write_delim(x = full.scenario.list,
-#             file = file.path(MARKER.ANALYSIS.FOLDER, "output", "all_scenarios.csv"),
-#             delim=",")
+full.scenario.list <- emissions %>% distinct(model,scenario) %>%
+  arrange(model,scenario)
 
+write_delim(x = full.scenario.list,
+            file = file.path(MARKER.ANALYSIS.FOLDER, "output", "all_scenarios.csv"),
+            delim=",")
 
+# Apply filters ----
 crit <- filter_criteria(df.emissions=emissions,
                         df.warming=warming,
-                        df.categories=categories)
+                        df.categories=categories,
+                        df.climate.timeseries=climate.timeseries)
+crit <- full.scenario.list %>% left_join(crit)
 
-
+## Save filter info
 write_delim(x = crit,
             file = file.path(MARKER.ANALYSIS.FOLDER, "output", "crit.csv"),
             delim=",")
 
+# Visualise filtering outcomes ----
 for (c in crit %>% select(starts_with("criteria")) %>% colnames() ){
   p.crit <- ggplot(crit, aes(x = interaction(scenario), y = model, fill = .data[[c]])) +
     facet_wrap(~target, scales="free", ncol=2) +
@@ -653,8 +777,170 @@ for (c in crit %>% select(starts_with("criteria")) %>% colnames() ){
 
 
 # Scenario Explorer data -------------------------------------------------------
+# ...
 
 
+# Find marker set combinations -------------------------------------------------
+passing.scens <- crit %>% filter(criteria==1) %>%
+  left_join(preferences) %>%
+  select(model,scenario,target,ssp,priority)
+# also drop out all options that have priority 5 or 6
+passing.scens <- passing.scens %>%
+  filter(priority<5)
+# also drop out the alternatives
+passing.scens <- passing.scens %>%
+  filter(!grepl(x=scenario,pattern="_"))
+
+passing.scens %>% group_by(target) %>% count()
+passing.scens %>% group_by(model,target) %>% count()
+passing.scens.wide.count <- passing.scens %>% group_by(model,target) %>% count() %>%
+  pivot_wider(names_from = target,
+              values_from = n)
+passing.scens.wide.count
+write_delim(x = passing.scens.wide.count,
+            file = file.path(MARKER.ANALYSIS.FOLDER, "output", "passing_scens_count.csv"),
+            delim=",")
+
+# # Helper to build one valid 6-element set
+# build_valid_set <- function(data, set_size = 6, max_attempts = 10000) {
+#   attempts <- 0
+#   results <- list()
+#
+#   while (attempts < max_attempts && length(results) < 1) {
+#     attempts <- attempts + 1
+#     candidate <- data[sample(nrow(data)), ]
+#
+#     set <- list()
+#     used_targets <- character()
+#     used_models <- character()
+#
+#     for (i in seq_len(nrow(candidate))) {
+#       row <- candidate[i, ]
+#       if (row$target %in% used_targets) next
+#       if (row$model %in% used_models) next
+#       set[[length(set) + 1]] <- row
+#       used_targets <- c(used_targets, row$target)
+#       used_models <- c(used_models, row$model)
+#       if (length(set) == set_size) break
+#     }
+#
+#     if (length(set) == set_size) {
+#       results[[length(results) + 1]] <- bind_rows(set)
+#     }
+#   }
+#
+#   return(bind_rows(results, .id = "set_id"))
+# }
+
+
+## Greedy option ----
+# Function to generate one valid set (stop at the first possible set)
+get_valid_set <- function(pool, set_size = 6) {
+  selected <- pool[0, ]
+  for (i in seq_len(nrow(passing.scens))) {
+    row <- passing.scens[i, ]
+    if (row$target %in% selected$target) next
+    if (row$model %in% selected$model) next
+    selected <- bind_rows(selected, row)
+    if (nrow(selected) == 6) return(selected)
+  }
+  return(NULL)
+}
+
+# Function to generate multiple disjoint sets
+generate_sets <- function(data, set_size = 6, max_sets = Inf) {
+
+  results <- list()
+
+  repeat {
+    data <- data[sample(nrow(data)), ] # sample anew to shuffle the order
+    pool <- data
+    set <- get_valid_set(pool, set_size)
+    if (is.null(set)) break
+    results[[length(results) + 1]] <- set
+    # Remove used rows from pool
+    pool <- anti_join(pool, set, by = c("model", "target", "scenario", "ssp"))
+    if (length(results) >= max_sets) break
+  }
+
+  # Bind results and assign set IDs
+  bind_rows(results, .id = "set_id")
+}
+
+# Run it
+valid_sets <- generate_sets(passing.scens, set_size = 6)
+valid_sets
+
+
+## Full combinatorics ----
+# install.packages("combinat")
+library(combinat)
+
+create_all_options <- function(df){
+  # Get all combinations of 6 rows
+  combs <- combn(nrow(passing.scens %>% select(model,scenario,target)), 6, simplify = FALSE)
+  length(combs) # takes a few seconds if combs is <10000 (expample nrow(passing.scens)=22 came with combs=74613)
+
+  # Keep only those where:
+  # - targets are unique
+  # - models are unique
+  valid_sets <- keep(combs, function(idx) {
+    set <- passing.scens[idx, ]
+    n_distinct(set$target) == 6 &&
+      n_distinct(set$model) == 6
+  })
+
+  valid_sets
+
+  all.valid.ms.combinations <- tibble()
+  ms.passing.scens <- passing.scens %>% distinct(model,scenario)
+  for (i in 1:length(valid_sets)){
+    set <- valid_sets[[i]]
+
+    set.ms <- tibble()
+    for (r in set){
+      set.ms <- set.ms %>%
+        bind_rows(
+          ms.passing.scens %>% filter(row_number()==r) %>%
+            mutate(option=i)
+        )
+    }
+
+
+    all.valid.ms.combinations <- all.valid.ms.combinations %>%
+      bind_rows(
+        set.ms
+      )
+  }
+  all.valid.ms.combinations <- all.valid.ms.combinations %>%
+    add_scenariomip_targets_to_IAM_scenarios() %>%
+    add_ssp_basis_to_IAM_scenarios()
+
+  return(all.valid.ms.combinations)
+}
+
+set_options <- create_all_options(df=passing.scens)
+
+set_options %>% distinct(model,target) %>% group_by(model) %>% count()
+set_options %>% distinct(model,scenario) %>% group_by(model) %>% count()
+
+set_options.priorities <- set_options %>%
+  left_join(preferences) %>%
+  reframe(
+    priority = sum(priority),
+    .by = c("option")
+  ) %>%
+  arrange(priority)
+set_options.priorities
+
+
+## Model specific notes ----
+#' why is remind dropping out on VLLO?
+#' - high-ish peak; drop methane harder 2050 or earlier [like AIM]
+#' - high negative co2 in 2100
+crit %>% filter(model=="REMIND",target=="VLLO") %>% View()
+emissions %>% filter(model=="REMIND",target=="VLLO",year==2050,variable=="Emissions|CH4")
+emissions %>% filter(model=="REMIND",target=="VLLO",year==2100,variable=="Emissions|CO2")
 
 # Plots ------------------------------------------------------------------------
 
@@ -679,35 +965,42 @@ TARGET.COLOURS <- c(
 )
 names(TARGET.COLOURS) <- TARGETS
 
-## Marker set ----
-marker.set <- warming %>% distinct(model,scenario) %>%
-  mutate(marker=NA) %>%
-  mutate_cond(((model=="IMAGE")&(scenario=="SSP1 - Very Low Emissions")),
-              marker="VLLO") %>%
-  mutate_cond(((model=="MESSAGE")&(scenario=="SSP4 - Low Overshoot")),
-              marker="VLHO") %>%
-  mutate_cond(((model=="GCAM")&(scenario=="SSP2 - Low Emissions")),
-              marker="L") %>%
-  mutate_cond(((model=="")&(scenario=="ML")),
-              marker="ML") %>%
-  mutate_cond(((model=="")&(scenario=="M")),
-              marker="M") %>%
-  mutate_cond(((model=="")&(scenario=="H")),
-              marker="H")
+## Pick a marker set ----
 
+### Functions ----
 keep_only_markers <- function(df,markers=marker.set){
   return(
     df %>% left_join(markers) %>%
       filter(!is.na(marker))
   )
 }
+### Different sets ----
+
+#### v1 ----
+marker.set <- warming %>% distinct(model,scenario) %>%
+  mutate(marker=NA) %>%
+  mutate_cond(((model=="AIM")&(scenario=="SSP1 - Very Low Emissions")), # choose SSP1
+              marker="VLLO") %>%
+  mutate_cond(((model=="REMIND")&(scenario=="SSP2 - Low Overshoot")), # REMIND only has SSP2
+              marker="VLHO") %>%
+  mutate_cond(((model=="MESSAGE")&(scenario=="SSP2 - Low Emissions")), # MESSAGE prefers SSP2 (over SSP1)
+              marker="L") %>%
+  mutate_cond(((model=="IMAGE")&(scenario=="SSP2 - Medium-Low Emissions")), # choose SSP2 (over SSP1)
+              marker="ML") %>%
+  mutate_cond(((model=="WITCH")&(scenario=="SSP2 - Medium Emissions")), # WITCH only has SSP2
+              marker="M") %>%
+  mutate_cond(((model=="GCAM")&(scenario=="SSP3 - High Emissions")), # choose SSP3
+              marker="H") %>%
+  mutate(version="v1")
+
+#### v2 ----
+# ...
 
 ## Climate ----
 
 climate.vars <- climate.timeseries %>% pull(variable) %>% unique()
 for (c in climate.vars){
   c.data <- climate.timeseries %>%
-    add_scenariomip_info_columns() %>%
     keep_only_markers() %>%
     filter(variable==c) %>%
     pivot_wider(names_from = percentile,
@@ -732,7 +1025,8 @@ for (c in climate.vars){
     labs(
       title = c.var,
       y = c.unit
-    )
+    ) +
+    legend_column_wise()
 
   save_ggplot(
     p = p.c,

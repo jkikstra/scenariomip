@@ -1644,6 +1644,28 @@ theme_jsk <- function() {
 
 }
 
+legend_column_wise <- function(legend.position = "bottom",
+                               legend.justification = "center", # control anchor point
+                               legend.box = "horizontal",
+                               legend.title.position = "top",
+                               ncol=1){
+  list(
+    theme(
+      legend.position = legend.position,
+      legend.justification = legend.justification,
+      legend.box = legend.box,
+      legend.title.position = legend.title.position
+    ),
+    guides(
+      color = guide_legend(ncol = ncol, byrow = TRUE),
+      fill = guide_legend(ncol = ncol, byrow = TRUE),
+      linetype = guide_legend(ncol = ncol, byrow = TRUE),
+      shape = guide_legend(ncol = ncol, byrow = TRUE)
+    )
+  )
+}
+
+
 #' Apply background colour to historical values (in a timeseries plot)
 #'
 #' @param
