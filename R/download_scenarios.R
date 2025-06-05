@@ -58,22 +58,27 @@ for index, (m, s) in enumerate(zip(props['model'], props['scenario'])):
   df = pyam.read_iiasa(
       'ssp_submission',
       model=m,
-      scenario=s
+      scenario=s,
+      # region='World',
+      variable='Price|Carbon*'
+      # variable='Carbon Removal*'
   )
 
   # Write out the scenario data
-  output_file = 'scenarios_scenariomip_' + m + '_' + s + '.csv'
-  df.to_csv(
-      os.path.join('data','downloading_iters',output_file)
-  )
-  print(f'Data has been written to {output_file}')
+  output_file = 'carbonprice_' + m + '_' + s + '.csv'
+  # output_file = 'global_carbonremoval_' + m + '_' + s + '.csv'
+  if df:
+    df.to_csv(
+        os.path.join('data','downloading_iters',output_file)
+    )
+    print(f'Data has been written to {output_file}')
 
 ")
 
 # Recombine the data files from each model into one file
 SCENARIO.FILES.FOLDER <- here("data", "downloading_iters")
 FILES.csv <- file.path(SCENARIO.FILES.FOLDER, dir(SCENARIO.FILES.FOLDER, pattern = "*.csv"))  # get file names
-FILES.csv <- FILES.csv[!grepl(FILES.csv, pattern="MESSAGEix-GLOBIOM 2.1-M-R12",fixed=T)]
+# FILES.csv <- FILES.csv[!grepl(FILES.csv, pattern="MESSAGEix-GLOBIOM 2.1-M-R12",fixed=T)]
 scenarios_csv <- FILES.csv %>%
   map(~ (load_csv_iamc(.) %>% iamc_wide_to_long() %>% filter(year<=2100) ) ) %>%
   reduce(rbind) %>%
@@ -103,11 +108,11 @@ write_delim(
 
 # ONLY EMISSIONS
 # scenarios_csv_o <- load_csv_iamc(here("data", paste0("scenarios_scenariomip_allmodels_2025-04-16.csv")), mode = "fast")
+
 emissions <- scenarios_csv_o %>% filter_starts_with("Emissions", column.name = "Variable")
 write_delim(
   x = emissions,
   file = here("data", paste0("scenarios_scenariomip_emissions_", Sys.Date(),".csv")),
-  # file = here("data", paste0("scenarios_scenariomip_emissions_2025-04-16.csv")),
   delim = ","
 )
 
@@ -116,6 +121,22 @@ emissions_global <- scenarios_csv_o %>% filter_starts_with("Emissions", column.n
 write_delim(
   x = emissions_global,
   file = here("data", paste0("scenarios_scenariomip_emissions_global_", Sys.Date(),".csv")),
+  delim = ","
+)
+
+# ONLY GLOBAL Carbon Removal
+cdr_global <- scenarios_csv_o %>% filter_starts_with("Carbon Removal", column.name = "Variable") %>% filter(Region=="World")
+write_delim(
+  x = cdr_global,
+  file = here("data", paste0("scenarios_scenariomip_cdr_global_", Sys.Date(),".csv")),
+  delim = ","
+)
+
+# ONLY GLOBAL Carbon Removal
+price <- scenarios_csv_o %>% filter_starts_with("Price", column.name = "Variable")
+write_delim(
+  x = price,
+  file = here("data", paste0("scenarios_scenariomip_prices_", Sys.Date(),".csv")),
   delim = ","
 )
 
@@ -134,7 +155,13 @@ write_delim(
   file = here("data", paste0("scenarios_floorspace_", Sys.Date(),"-message.csv")),
   delim = ","
 )
-
+# Mobility Passenger MESSAGE
+passenger_message <- scenarios_csv_message %>% filter(grepl(x=Variable, pattern="Passenger", fixed=T))
+write_delim(
+  x = passenger_message,
+  file = here("data", paste0("scenarios_passenger_", Sys.Date(),"-message.csv")),
+  delim = ","
+)
 
 
 
