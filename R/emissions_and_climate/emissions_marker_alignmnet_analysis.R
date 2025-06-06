@@ -1433,6 +1433,42 @@ produce_marker_set_plots <- function(emissions,
         unit = "mm"
       )
 
+      p.harm.ch4.loworder <- ggplot(h %>% filter(
+        variable == "Emissions|CH4",
+        stage=="harmonized",
+        marker %in% c("VLLO", "VLHO", "L")
+      ),
+                       aes(x=year,y=value,linetype=stage,
+                           group=interaction(model,scenario,variable,region,unit,stage))) +
+        facet_wrap(.~variable, scales = "free_y", ncol=h %>% pull(variable) %>% unique() %>% length()) +
+        mark_history(sy=2025) +
+        geom_line(aes(colour=scenario), linewidth = 1.3) +
+        theme_jsk() +
+        theme(
+          strip.text.y = element_text(angle = 0,hjust = 0)
+        ) +
+        scale_color_manual(values = scenario_colours) +
+        # scale_fill_manual(values = scenario_colours) +
+        # scale_linetype_manual(values = scenario_linetypes) +
+        labs(
+          title = "Harmonized CH4 emissions",
+          y = "Mt CH4/yr",
+          caption = caption.figure,
+          colour = "Scenario",
+          # fill = "Scenario",
+          linetype = "Scenario"
+        ) +
+        legend_column_wise(ncol = legend.ncol.per.indicator)
+
+      save_ggplot(
+        p = p.harm.ch4.loworder,
+        f = file.path(MARKER.ANALYSIS.FOLDER, "output", paste0(prefix.figure, "harmonization_timeseries_ch4_order" ) ),
+        h = 150,
+        w = 150,
+        format = p.format, bg = 'white',
+        unit = "mm"
+      )
+
       p.harm.cumu <- ggplot(h %>% filter_includes("Cumulative Emissions|CO2|Energy and Industrial Processes"),
                        aes(x=year,y=value,linetype=stage,
                            group=interaction(model,scenario,variable,region,unit,stage))) +
@@ -1918,7 +1954,7 @@ save_ggplot(
 )
 
 cdr.l <- cdr %>% filter(ssp=="SSP2", target=="L", model%in%c(
-  "MESSAGE", "IMAGE"
+  "MESSAGE", "IMAGE", "AIM"
 )) %>% filter(year%in%seq(2025,2100,5))
 
 cdr.bars.l <- ggplot(
@@ -1960,7 +1996,7 @@ cdr.bars.l <- ggplot(
 # cdr.bars
 
 save_ggplot(
-  p = cdr.bars.,
+  p = cdr.bars.l,
   f = file.path(MARKER.ANALYSIS.FOLDER, "output", paste0("v20250604", "_CDR_bars_L" ) ),
   h = 200,
   w = 150,
