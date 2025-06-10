@@ -3262,12 +3262,12 @@ p.2100.800
 p.peak.800 <- ggplot(
   cumuco2.2100 %>% filter(
     stage=="harmonized"
-  ) %>% left_join(temp.peak %>% rename(tpeak = value) %>% mutate(tpeak=as.numeric(tpeak)) %>% select(-variable,-unit)) %>%
+  ) %>% left_join(temp.peak.p67 %>% rename(tpeak.p67 = value) %>% mutate(tpeak.p67=as.numeric(tpeak.p67)) %>% select(-variable,-unit)) %>%
     filter(
       value<=1100
     ),
   aes(x=value + emissions.2020.to.2023,
-      y=tpeak)
+      y=tpeak.p67)
 ) +
   geom_point() +
   geom_smooth(formula = "y ~ x", method = "lm")
