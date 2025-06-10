@@ -3226,6 +3226,55 @@ save_ggplot(
 # Other ----
 # ______ ----
 
+## ScenarioMIP ----
+
+### Peak and 2100 temps at ~800GtCO2 ----
+
+cumuco2 <- harmonization.compare.cumulative.co2.split %>%
+  reframe(
+    value = sum(value),
+    variable = "Cumulative Emissions|CO2",
+    .by = c("model", "scenario", "region", "unit", "year", "stage")
+  ) %>% filter(variable=="Cumulative Emissions|CO2") %>%
+  add_scenariomip_info_columns()
+cumuco2.2100 <- cumuco2 %>% filter(year==2100)
+
+temp.peak <- warming %>% filter(quantile==0.5, metric=="max")
+temp.peak.p67 <- warming %>% filter(quantile==0.67, metric=="max")
+temp.2100 <- warming %>% filter(quantile==0.5, metric=="2100")
+
+emissions.2020.to.2023 <- 41*3
+
+p.2100.800 <- ggplot(
+  cumuco2.2100 %>% filter(
+    stage=="harmonized"
+  ) %>% left_join(temp.2100 %>% rename(t2100 = value) %>% mutate(t2100=as.numeric(t2100)) %>% select(-variable,-unit)) %>%
+    filter(
+      value<=1100
+    ),
+  aes(x=value + emissions.2020.to.2023,
+      y=t2100)
+) +
+  geom_point() +
+  geom_smooth(formula = "y ~ x", method = "lm")
+p.2100.800
+
+p.peak.800 <- ggplot(
+  cumuco2.2100 %>% filter(
+    stage=="harmonized"
+  ) %>% left_join(temp.peak %>% rename(tpeak = value) %>% mutate(tpeak=as.numeric(tpeak)) %>% select(-variable,-unit)) %>%
+    filter(
+      value<=1100
+    ),
+  aes(x=value + emissions.2020.to.2023,
+      y=tpeak)
+) +
+  geom_point() +
+  geom_smooth(formula = "y ~ x", method = "lm")
+p.peak.800
+
+
+
 ## AerChemMIP ----
 
 ### example of harmonized emissions ----
