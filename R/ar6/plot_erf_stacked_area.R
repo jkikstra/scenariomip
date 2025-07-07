@@ -116,9 +116,8 @@ p.twoscen <- ggplot(
   theme_jsk() +
   scale_fill_jco() +
   labs(y=bquote(W/m^2),
-       title = "Effective Radiative forcing contributions",
-       subtitle = "Illustrative Pathways from the IPCC Sixth Assessment Report.\n2100 GSAT in parentheses.",
-       caption = "Using MAGICC climate emulator, 50th percentile of distribution") +
+       title = "Illustrative Pathways from the IPCC Sixth Assessment Report (2100 temperature in parentheses)",
+       subtitle = "Effective radiative forcing contributions") +
   legend_column_wise(ncol=5) +
   scale_x_continuous(expand = c(0,0), breaks = c(2025,2050,2075,2100)) +
   theme(legend.title = element_blank())
@@ -134,11 +133,12 @@ p.temp <- ggplot(
   theme_jsk() +
   scale_fill_jco() +
   labs(y="Temperature (°C)",
-       title = "Temperature change",
-       caption = "Using MAGICC climate emulator, 50th percentile of distribution") +
+       subtitle = "Temperature change",
+       caption = "Using MAGICC climate emulator, median of distribution. Illustrative pathways are 'IMP-CurPol', 'IMP-ModAct', 'IMP-Ren', and 'IMP-SP'.\n\nBased on data from Kikstra et al. (2022), Geoscientific Model Development:\nThe IPCC Sixth Assessment Report WGIII climate assessment of mitigation pathways: from emissions to global temperatures.") +
   legend_column_wise(ncol=5) +
   scale_x_continuous(expand = c(0,0), breaks = c(2025,2050,2075,2100)) +
-  theme(legend.title = element_blank())
+  theme(legend.title = element_blank()) +
+  theme(plot.caption = element_text(hjust = 0, vjust = 0))
 # p.temp
 
 p.example <- (p.twoscen + p.temp) + plot_layout(
