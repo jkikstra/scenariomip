@@ -26,6 +26,7 @@ SECTOR.VARIABLES.MAPPING.ONE.ON.ONE <- c(
   "Energy|Demand|Bunkers|International Shipping",
   "Energy|Demand|Residential and Commercial and AFOFI",
   "Product Use",
+  "AFOLU",
   "AFOLU|Agricultural Waste Burning",
   "AFOLU|Land|Fires|Forest Burning",
   "AFOLU|Land|Fires|Grassland Burning",

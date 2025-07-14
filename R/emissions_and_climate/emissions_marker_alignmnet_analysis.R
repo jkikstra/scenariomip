@@ -24,14 +24,23 @@ MARKER.ANALYSIS.FOLDER <- here("data", "marker selection")
 
 # FILES ----
 
-EMISSIONS.FILE <- "scenarios_scenariomip_emissions_global_2025-06-04.csv"
-CDR.FILE <- "scenarios_scenariomip_cdr_global_2025-06-05.csv"
-
-MAGICC.FOLDER <- file.path("climate", "May 23 submission","climate-assessment")
-
+# climate
+MAGICC.FOLDER <- file.path("climate", "July 13 submission","climate-assessment")
 PATH.CLIMATE.DATA <- file.path(MARKER.ANALYSIS.FOLDER, MAGICC.FOLDER)
 
+# marker data (all variables)
+MARKER.SET.FOLDER <- here("data", "marker_set", "20250713")
+
+
+# all scenarios, specific variables
+EMISSIONS.FILE <- "" # OLD, not used right now
+CDR.FILE <- "" # OLD, not used right now
+
+# priorities (during marker selection)
 PRIORITIES.FILE <- "20250523_MarkerPriorities.xlsx"
+
+# only use marker set data, or all data?
+OVERRIDE.ALLDATA.WITH.MARKERSET.DATA <- TRUE
 
 
 # THRESHOLDS ----
@@ -182,6 +191,7 @@ load_multiple_files <- function(folder.path,
                                 id.cols=NULL,
                                 mi.cols=NULL,
                                 magicc.percentiles.calculation=F,
+                                iamc.wide.to.long = T,
                                 ...){
 
   # Get files matching the extension
@@ -259,7 +269,9 @@ load_multiple_files <- function(folder.path,
       "xlsx" = map_dfr(all_files, load_excel_iamc),# bind using purr::map_dfr
       stop(glue::glue("Unsupported file type: {filetype}"))
     )
-    df <- df %>% iamc_wide_to_long(upper.to.lower = upper.to.lower)
+    if (iamc.wide.to.long){
+      df <- df %>% iamc_wide_to_long(upper.to.lower = upper.to.lower)
+    }
   }
 
 
@@ -351,8 +363,14 @@ climate.timeseries <- climate.timeseries.gsat %>%
 climate.timeseries %>% distinct(model)
 
 
+### IAM data: marker set -------------------------------------------------------
+marker.data <- load_multiple_files(iamc = T,
+                                   filetype = "csv",
+                                   folder.path = MARKER.SET.FOLDER,
+                                   iamc.wide.to.long = F)
 
-### IAM data -------------------------------------------------------------------
+
+### IAM data: across all data --------------------------------------------------
 
 # all.iam.data <- load_csv_iamc(file.path(MARKER.ANALYSIS.FOLDER,
 #                                         "..",
@@ -373,17 +391,26 @@ climate.timeseries %>% distinct(model)
 #  ))
 
 #### Emissions -----------------------------------------------------------------
-emissions <- load_csv_iamc(file.path(MARKER.ANALYSIS.FOLDER,
-                                     "iam_alldata",
-                                EMISSIONS.FILE),
-                           mode = "fast") %>%
+# emissions <- load_csv_iamc(file.path(MARKER.ANALYSIS.FOLDER,
+#                                      "iam_alldata",
+#                                 EMISSIONS.FILE),
+#                            mode = "fast")
+# emissions <- marker.data %>% filter_begins_with("Emissions")
+
+# emissions.regional <- NA
+
+if (OVERRIDE.ALLDATA.WITH.MARKERSET.DATA){
+  emissions <- marker.data
+}
+
+emissions <- emissions %>%
   filter(Region=="World") %>%
   filter_starts_with(column.name = "Variable",
                      "Emissions") %>%
   iamc_wide_to_long(upper.to.lower = T) %>%
   add_scenariomip_info_columns()
 
-# emissions.regional <- NA
+
 
 ##### Cumulative CO2 -----------------------------------------------------------
 start_year <- 2020
@@ -419,12 +446,19 @@ cumulative.co2
 cdr <- load_csv_iamc(file.path(MARKER.ANALYSIS.FOLDER,
                                      "iam_alldata",
                                      CDR.FILE),
-                           mode = "fast") %>%
+                           mode = "fast")
+
+if (OVERRIDE.ALLDATA.WITH.MARKERSET.DATA){
+  cdr <- marker.data
+}
+
+cdr <- cdr %>%
   filter(Region=="World") %>%
   filter_starts_with(column.name = "Variable",
                      "Carbon") %>%
   iamc_wide_to_long(upper.to.lower = T) %>%
   add_scenariomip_info_columns()
+
 
 ### Harmonized ---------------------------------------------------------------
 # Download from: https://iiasahub.sharepoint.com/sites/eceprog/Shared%20Documents/Forms/AllItems.aspx?FolderCTID=0x012000AA9481BF7BE9264E85B14105F7F082FF&id=%2Fsites%2Feceprog%2FShared%20Documents%2FProjects%2FCMIP7%2FIAM%20Data%20Processing%2FScenarioMIP%20Emulator%20workflow%2FApril%2011%20submission%2Fscm%2Doutput%2F0005%5F0002%5F0002%5F0002%5F0002%5F0002%5F0003%5F0002%5F0002%5F0002%5F0002%5F95b5f2c9fb62e32a4d08fe2ffc5b4a6ff246ad2d%5F0003%5F0003%5F0002
@@ -910,6 +944,11 @@ TARGET.COLOURS <- c(
   '#c87820', # M
   '#d3a640', # ML
   '#098740', # L
+  '#098740', # L
+  '#0080d0', # VLHO
+  '#0080d0', # VLHO
+  '#0080d0', # VLHO
+  '#0080d0', # VLHO
   '#0080d0', # VLHO
   '#100060' # VLLO
 )
@@ -985,6 +1024,31 @@ create_all_options <- function(df, set.size=6){
 
   return(all.valid.ms.combinations)
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ### Apply different sets ---
 # #### 23.05.2025: 6 options Keywan for meeting  -----------------------------------
@@ -1125,65 +1189,65 @@ create_all_options <- function(df, set.size=6){
 
 
 #### 04.06.2025: options for final marker meeting  -----------------------------
-marker.sets.v20250604.starter <- climate.timeseries %>% distinct(model,scenario) %>%
-  mutate(marker=NA) %>%
-  mutate_cond(((model=="REMIND")&(scenario=="SSP1 - Very Low Emissions")),
-              marker="VLLO") %>%
-  # mutate_cond(((model=="AIM")&(scenario=="SSP2 - Low Overshoot")),
-  #             marker="VLHO") %>%
-  # mutate_cond(((model=="COFFEE")&(scenario=="SSP2 - Low Emissions")),
-  #             marker="L") %>%
-  mutate_cond(((model=="COFFEE")&(scenario=="SSP2 - Medium-Low Emissions")),
-              marker="ML") %>%
-  mutate_cond(((model=="MESSAGE")&(scenario=="SSP2 - Medium Emissions")),
-              marker="M") %>%
-  mutate_cond(((model=="GCAM")&(scenario=="SSP3 - High Emissions")), # choose SSP3
-              marker="H") %>%
-  mutate(version="v20250604_fixed")
+# marker.sets.v20250604.starter <- climate.timeseries %>% distinct(model,scenario) %>%
+#   mutate(marker=NA) %>%
+#   mutate_cond(((model=="REMIND")&(scenario=="SSP1 - Very Low Emissions")),
+#               marker="VLLO") %>%
+#   # mutate_cond(((model=="AIM")&(scenario=="SSP2 - Low Overshoot")),
+#   #             marker="VLHO") %>%
+#   # mutate_cond(((model=="COFFEE")&(scenario=="SSP2 - Low Emissions")),
+#   #             marker="L") %>%
+#   mutate_cond(((model=="COFFEE")&(scenario=="SSP2 - Medium-Low Emissions")),
+#               marker="ML") %>%
+#   mutate_cond(((model=="MESSAGE")&(scenario=="SSP2 - Medium Emissions")),
+#               marker="M") %>%
+#   mutate_cond(((model=="GCAM")&(scenario=="SSP3 - High Emissions")), # choose SSP3
+#               marker="H") %>%
+#   mutate(version="v20250604_fixed")
+#
+# vlho.l.options <- crossing(
+#   scenario = c("SSP2 - Low Overshoot",
+#                "SSP2 - Low Overshoot_a",
+#                "SSP2 - Low Overshoot_b",
+#                "SSP2 - Low Overshoot_c",
+#                "SSP2 - Low Overshoot_d",
+#                "SSP2 - Low Emissions",
+#                "SSP2 - Low Emissions_a"),
+#   model = c("AIM")
+# ) %>%
+#   bind_rows(
+#     crossing(
+#       scenario = c("SSP2 - Low Overshoot",
+#                    "SSP2 - Low Overshoot_a",
+#                    "SSP2 - Low Emissions"),
+#       model = c("IMAGE")
+#     )
+#   ) %>%
+#   add_scenariomip_info_columns()
+# v20250604.subset.options <- create_all_options(df=vlho.l.options, set.size = 2)
 
-vlho.l.options <- crossing(
-  scenario = c("SSP2 - Low Overshoot",
-               "SSP2 - Low Overshoot_a",
-               "SSP2 - Low Overshoot_b",
-               "SSP2 - Low Overshoot_c",
-               "SSP2 - Low Overshoot_d",
-               "SSP2 - Low Emissions",
-               "SSP2 - Low Emissions_a"),
-  model = c("AIM")
-) %>%
-  bind_rows(
-    crossing(
-      scenario = c("SSP2 - Low Overshoot",
-                   "SSP2 - Low Overshoot_a",
-                   "SSP2 - Low Emissions"),
-      model = c("IMAGE")
-    )
-  ) %>%
-  add_scenariomip_info_columns()
-v20250604.subset.options <- create_all_options(df=vlho.l.options, set.size = 2)
-
-marker.sets.v20250604 <- marker.sets.v20250604.starter
-for (i in v20250604.subset.options %>% pull(option) %>% unique()){
-  subset <- v20250604.subset.options %>% filter(option==i)
-
-  m.vlho <- subset %>% filter(target=="VLHO") %>% pull(model)
-  s.vlho <- subset %>% filter(target=="VLHO") %>% pull(scenario)
-  m.l <- subset %>% filter(target=="L") %>% pull(model)
-  s.l <- subset %>% filter(target=="L") %>% pull(scenario)
-
-  marker.sets.v20250604 <- marker.sets.v20250604 %>%
-    bind_rows(
-      marker.sets.v20250604.starter %>%
-        mutate_cond(((model==m.vlho)&(scenario==s.vlho)),
-                    marker="VLHO") %>%
-        mutate_cond(((model==m.l)&(scenario==s.l)),
-                    marker="L") %>%
-        mutate(version=paste0("v20250604_",i))
-    )
-}
-marker.sets.v20250604 <- marker.sets.v20250604 %>% filter(version!="v20250604_fixed")
-marker.sets.v20250604 %>% distinct(version)
-nrow(marker.sets.v20250604)
+# marker.sets.v20250604 <- marker.sets.v20250604.starter
+# for (i in v20250604.subset.options %>% pull(option) %>% unique()){
+#   subset <- v20250604.subset.options %>% filter(option==i)
+#
+#   m.vlho <- subset %>% filter(target=="VLHO") %>% pull(model)
+#   s.vlho <- subset %>% filter(target=="VLHO") %>% pull(scenario)
+#   m.l <- subset %>% filter(target=="L") %>% pull(model)
+#   s.l <- subset %>% filter(target=="L") %>% pull(scenario)
+#
+#   marker.sets.v20250604 <- marker.sets.v20250604 %>%
+#     bind_rows(
+#       marker.sets.v20250604.starter %>%
+#         mutate_cond(((model==m.vlho)&(scenario==s.vlho)),
+#                     marker="VLHO") %>%
+#         mutate_cond(((model==m.l)&(scenario==s.l)),
+#                     marker="L") %>%
+#         mutate(version=paste0("v20250604_",i))
+#     )
+# }
+# marker.sets.v20250604 <- marker.sets.v20250604 %>% filter(version!="v20250604_fixed")
+# marker.sets.v20250604 %>% distinct(version)
+# nrow(marker.sets.v20250604)
 
 
 
@@ -1395,6 +1459,52 @@ produce_marker_set_plots <- function(emissions,
   }
 
   #### Plots: harmonization ----
+
+  # For each separate species
+  if (!is.null(harmonization)){
+    emissions.harmonized.vars <- h %>% variable_unique()
+    for (e in emissions.harmonized.vars){
+      em.data <- h %>% filter(variable==e,
+                               stage=="harmonized")
+
+      em.data <- set_up_plotting_style_scenarios(em.data)
+
+      em.var <- em.data %>% pull(variable) %>% unique()
+      em.unit <- em.data %>% pull(unit) %>% unique()
+
+      p.em <- ggplot(em.data %>% filter(year>=2010),aes(x=year,y=value)) +
+        geom_line(aes(colour=scenario,
+                      # linetype=scenario
+        )) +
+        theme_jsk() +
+        mark_history(sy=2025)+
+        # scale_color_manual(values = TARGET.COLOURS, breaks = names(TARGET.COLOURS)) +
+        scale_color_manual(values = scenario_colours) +
+        # scale_fill_manual(values = scenario_colours) +
+        # scale_linetype_manual(values = scenario_linetypes) +
+        labs(
+          title = em.var,
+          y = em.unit,
+          caption = caption.figure,
+          colour = "Scenario",
+          # fill = "Scenario",
+          linetype = "Scenario"
+        ) +
+        legend_column_wise(ncol = legend.ncol.per.indicator)
+
+      save_ggplot(
+        p = p.em,
+        f = file.path(MARKER.ANALYSIS.FOLDER, "output", paste0(prefix.figure, "emissions_harmonized_", clean_string(e) ) ),
+        h = 150,
+        w = 150,
+        format = p.format, bg = 'white',
+        unit = "mm"
+      )
+    }
+  }
+
+
+  # Multiple species
   if (!is.null(harmonization)){
 
     h <- set_up_plotting_style_scenarios(h)
@@ -1533,37 +1643,37 @@ produce_marker_set_plots <- function(emissions,
       #   unit = "mm"
       # )
 
-      p.harm.no.image <- ggplot(h %>% filter(model!="IMAGE"),
-                            aes(x=year,y=value,linetype=stage,
-                                group=interaction(model,scenario,variable,region,unit,stage))) +
-        facet_wrap(.~variable, scales = "free_y", ncol=h %>% pull(variable) %>% unique() %>% length()) +
-        mark_history(sy=2025) +
-        geom_line(aes(colour=scenario), linewidth = 1.3) +
-        theme_jsk() +
-        theme(
-          strip.text.y = element_text(angle = 0,hjust = 0)
-        ) +
-        scale_color_manual(values = scenario_colours) +
-        # scale_fill_manual(values = scenario_colours) +
-        # scale_linetype_manual(values = scenario_linetypes) +
-        labs(
-          title = "Harmonization effect (for input to MAGICC)",
-          # y = em.unit,
-          caption = caption.figure,
-          colour = "Scenario",
-          # fill = "Scenario",
-          linetype = "Scenario"
-        ) +
-        legend_column_wise(ncol = legend.ncol.per.indicator)
-
-      save_ggplot(
-        p = p.harm.no.image,
-        f = file.path(MARKER.ANALYSIS.FOLDER, "output", paste0(prefix.figure, "harmonization_timeseries_no_IMAGE" ) ),
-        h = 125,
-        w = 350,
-        format = p.format, bg = 'white',
-        unit = "mm"
-      )
+      # p.harm.no.image <- ggplot(h %>% filter(model!="IMAGE"),
+      #                       aes(x=year,y=value,linetype=stage,
+      #                           group=interaction(model,scenario,variable,region,unit,stage))) +
+      #   facet_wrap(.~variable, scales = "free_y", ncol=h %>% pull(variable) %>% unique() %>% length()) +
+      #   mark_history(sy=2025) +
+      #   geom_line(aes(colour=scenario), linewidth = 1.3) +
+      #   theme_jsk() +
+      #   theme(
+      #     strip.text.y = element_text(angle = 0,hjust = 0)
+      #   ) +
+      #   scale_color_manual(values = scenario_colours) +
+      #   # scale_fill_manual(values = scenario_colours) +
+      #   # scale_linetype_manual(values = scenario_linetypes) +
+      #   labs(
+      #     title = "Harmonization effect (for input to MAGICC)",
+      #     # y = em.unit,
+      #     caption = caption.figure,
+      #     colour = "Scenario",
+      #     # fill = "Scenario",
+      #     linetype = "Scenario"
+      #   ) +
+      #   legend_column_wise(ncol = legend.ncol.per.indicator)
+      #
+      # save_ggplot(
+      #   p = p.harm.no.image,
+      #   f = file.path(MARKER.ANALYSIS.FOLDER, "output", paste0(prefix.figure, "harmonization_timeseries_no_IMAGE" ) ),
+      #   h = 125,
+      #   w = 350,
+      #   format = p.format, bg = 'white',
+      #   unit = "mm"
+      # )
 
     }
 
@@ -1745,12 +1855,120 @@ produce_marker_set_plots <- function(emissions,
 # }
 
 
-### Run plots (v20250605) ----
-marker.sets.v20250605.newoption_set3 <- climate.timeseries %>% distinct(model,scenario) %>%
+# ### Run plots (v20250605) ----
+# marker.sets.v20250605.newoption_set3 <- climate.timeseries %>% distinct(model,scenario) %>%
+#   mutate(marker=NA) %>%
+#   mutate_cond(((model=="REMIND")&(scenario=="SSP1 - Very Low Emissions")),
+#               marker="VLLO") %>%
+#   mutate_cond(((model=="AIM")&(scenario=="SSP2 - Low Overshoot_b")),
+#               marker="VLHO") %>%
+#   mutate_cond(((model=="MESSAGE")&(scenario=="SSP2 - Low Emissions")),
+#               marker="L") %>%
+#   mutate_cond(((model=="COFFEE")&(scenario=="SSP2 - Medium-Low Emissions")),
+#               marker="ML") %>%
+#   mutate_cond(((model=="IMAGE")&(scenario=="SSP2 - Medium Emissions")),
+#               marker="M") %>%
+#   mutate_cond(((model=="GCAM")&(scenario=="SSP3 - High Emissions")), # choose SSP3
+#               marker="H") %>%
+#   mutate(version="v20250605_newoption_set3")
+# marker.sets.v20250605.existingoption_set1 <- climate.timeseries %>% distinct(model,scenario) %>%
+#   mutate(marker=NA) %>%
+#   mutate_cond(((model=="REMIND")&(scenario=="SSP1 - Very Low Emissions")),
+#               marker="VLLO") %>%
+#   mutate_cond(((model=="AIM")&(scenario=="SSP2 - Low Overshoot_b")),
+#               marker="VLHO") %>%
+#   mutate_cond(((model=="IMAGE")&(scenario=="SSP2 - Low Emissions")),
+#               marker="L") %>%
+#   mutate_cond(((model=="COFFEE")&(scenario=="SSP2 - Medium-Low Emissions")),
+#               marker="ML") %>%
+#   mutate_cond(((model=="MESSAGE")&(scenario=="SSP2 - Medium Emissions")),
+#               marker="M") %>%
+#   mutate_cond(((model=="GCAM")&(scenario=="SSP3 - High Emissions")), # choose SSP3
+#               marker="H") %>%
+#   mutate(version="v20250605_existingoption_set1")
+# marker.sets.v20250605.existingoption_set2 <- climate.timeseries %>% distinct(model,scenario) %>%
+#   mutate(marker=NA) %>%
+#   mutate_cond(((model=="REMIND")&(scenario=="SSP1 - Very Low Emissions")),
+#               marker="VLLO") %>%
+#   mutate_cond(((model=="IMAGE")&(scenario=="SSP2 - Low Overshoot")),
+#               marker="VLHO") %>%
+#   mutate_cond(((model=="AIM")&(scenario=="SSP2 - Low Emissions")),
+#               marker="L") %>%
+#   mutate_cond(((model=="COFFEE")&(scenario=="SSP2 - Medium-Low Emissions")),
+#               marker="ML") %>%
+#   mutate_cond(((model=="MESSAGE")&(scenario=="SSP2 - Medium Emissions")),
+#               marker="M") %>%
+#   mutate_cond(((model=="GCAM")&(scenario=="SSP3 - High Emissions")), # choose SSP3
+#               marker="H") %>%
+#   mutate(version="v20250605_existingoption_set2")
+# marker.sets.v20250605 <- marker.sets.v20250605.newoption_set3 %>%
+#   bind_rows(marker.sets.v20250605.existingoption_set1) %>%
+#   bind_rows(marker.sets.v20250605.existingoption_set2)
+#
+# for (v.marker in (marker.sets.v20250605 %>% pull(version) %>% unique())){
+#   print(v.marker)
+#   # produce_marker_set_plots(emissions = emissions %>% bind_rows(cumulative.co2),
+#   #                          climate.timeseries = climate.timeseries,
+#   #                          v = v.marker,
+#   #                          harmonization = harm.data,
+#   #                          marker.sets = marker.sets.v20250604,
+#   #                          markers.to.show = "all")
+#   produce_marker_set_plots(emissions = emissions %>% bind_rows(cumulative.co2),
+#                            climate.timeseries = climate.timeseries,
+#                            v = v.marker,
+#                            harmonization = harm.data,
+#                            marker.sets = marker.sets.v20250605,
+#                            low.scens = c("VLLO", "VLHO", "L", "ML", "M"),
+#                            markers.to.show = "low")
+# }
+
+
+# ## Run plots (v20250623 and later) ----
+#
+# marker.set.final <- climate.timeseries %>% distinct(model,scenario) %>%
+#   mutate(marker=NA) %>%
+#   mutate_cond(((model=="REMIND")&(scenario=="SSP1 - Very Low Emissions")),
+#               marker="VLLO") %>%
+#   mutate_cond(((model=="AIM")&(scenario=="SSP2 - Low Overshoot")),
+#               marker="VLHO") %>%
+#   mutate_cond(((model=="MESSAGE")&(scenario=="SSP2 - Low Emissions")),
+#               marker="L") %>%
+#   mutate_cond(((model=="COFFEE")&(scenario=="SSP2 - Medium-Low Emissions")),
+#               marker="ML") %>%
+#   mutate_cond(((model=="IMAGE")&(scenario=="SSP2 - Medium Emissions")),
+#               marker="M") %>%
+#   mutate_cond(((model=="GCAM")&(scenario=="SSP3 - High Emissions")),
+#               marker="H") %>%
+#   mutate_cond(((model=="WITCH")&(scenario=="SSP5 - Medium-Low Emissions_a")),
+#               marker="HL") %>%
+#   mutate(version="v20250621")
+#
+#
+# for (v.marker in (marker.set.final %>% pull(version) %>% unique())){
+#   print(v.marker)
+#   produce_marker_set_plots(emissions = emissions %>% bind_rows(cumulative.co2),
+#                            climate.timeseries = climate.timeseries,
+#                            v = v.marker,
+#                            harmonization = harm.data,
+#                            marker.sets = marker.set.final,
+#                            markers.to.show = "all")
+#   produce_marker_set_plots(emissions = emissions %>% bind_rows(cumulative.co2),
+#                            climate.timeseries = climate.timeseries,
+#                            v = v.marker,
+#                            harmonization = harm.data,
+#                            marker.sets = marker.set.final,
+#                            low.scens = c("VLLO", "VLHO", "L"),
+#                            markers.to.show = "low")
+# }
+
+
+## Run plots (v20250713 and later) ----
+
+marker.set.final <- climate.timeseries %>% distinct(model,scenario) %>%
   mutate(marker=NA) %>%
   mutate_cond(((model=="REMIND")&(scenario=="SSP1 - Very Low Emissions")),
               marker="VLLO") %>%
-  mutate_cond(((model=="AIM")&(scenario=="SSP2 - Low Overshoot_b")),
+  mutate_cond(((model=="AIM")&(scenario=="SSP2 - Low Overshoot")),
               marker="VLHO") %>%
   mutate_cond(((model=="MESSAGE")&(scenario=="SSP2 - Low Emissions")),
               marker="L") %>%
@@ -1758,59 +1976,38 @@ marker.sets.v20250605.newoption_set3 <- climate.timeseries %>% distinct(model,sc
               marker="ML") %>%
   mutate_cond(((model=="IMAGE")&(scenario=="SSP2 - Medium Emissions")),
               marker="M") %>%
-  mutate_cond(((model=="GCAM")&(scenario=="SSP3 - High Emissions")), # choose SSP3
+  mutate_cond(((model=="GCAM")&(scenario=="SSP3 - High Emissions_a")),
               marker="H") %>%
-  mutate(version="v20250605_newoption_set3")
-marker.sets.v20250605.existingoption_set1 <- climate.timeseries %>% distinct(model,scenario) %>%
-  mutate(marker=NA) %>%
-  mutate_cond(((model=="REMIND")&(scenario=="SSP1 - Very Low Emissions")),
-              marker="VLLO") %>%
-  mutate_cond(((model=="AIM")&(scenario=="SSP2 - Low Overshoot_b")),
-              marker="VLHO") %>%
-  mutate_cond(((model=="IMAGE")&(scenario=="SSP2 - Low Emissions")),
-              marker="L") %>%
-  mutate_cond(((model=="COFFEE")&(scenario=="SSP2 - Medium-Low Emissions")),
-              marker="ML") %>%
-  mutate_cond(((model=="MESSAGE")&(scenario=="SSP2 - Medium Emissions")),
-              marker="M") %>%
-  mutate_cond(((model=="GCAM")&(scenario=="SSP3 - High Emissions")), # choose SSP3
-              marker="H") %>%
-  mutate(version="v20250605_existingoption_set1")
-marker.sets.v20250605.existingoption_set2 <- climate.timeseries %>% distinct(model,scenario) %>%
-  mutate(marker=NA) %>%
-  mutate_cond(((model=="REMIND")&(scenario=="SSP1 - Very Low Emissions")),
-              marker="VLLO") %>%
-  mutate_cond(((model=="IMAGE")&(scenario=="SSP2 - Low Overshoot")),
-              marker="VLHO") %>%
-  mutate_cond(((model=="AIM")&(scenario=="SSP2 - Low Emissions")),
-              marker="L") %>%
-  mutate_cond(((model=="COFFEE")&(scenario=="SSP2 - Medium-Low Emissions")),
-              marker="ML") %>%
-  mutate_cond(((model=="MESSAGE")&(scenario=="SSP2 - Medium Emissions")),
-              marker="M") %>%
-  mutate_cond(((model=="GCAM")&(scenario=="SSP3 - High Emissions")), # choose SSP3
-              marker="H") %>%
-  mutate(version="v20250605_existingoption_set2")
-marker.sets.v20250605 <- marker.sets.v20250605.newoption_set3 %>%
-  bind_rows(marker.sets.v20250605.existingoption_set1) %>%
-  bind_rows(marker.sets.v20250605.existingoption_set2)
+  mutate_cond(((model=="WITCH")&(scenario=="SSP5 - Medium-Low Emissions_a")),
+              marker="HL") %>%
+  mutate(version="v20250713")
 
-for (v.marker in (marker.sets.v20250605 %>% pull(version) %>% unique())){
+
+for (v.marker in (marker.set.final %>% pull(version) %>% unique())){
   print(v.marker)
-  # produce_marker_set_plots(emissions = emissions %>% bind_rows(cumulative.co2),
-  #                          climate.timeseries = climate.timeseries,
-  #                          v = v.marker,
-  #                          harmonization = harm.data,
-  #                          marker.sets = marker.sets.v20250604,
-  #                          markers.to.show = "all")
-  produce_marker_set_plots(emissions = emissions %>% bind_rows(cumulative.co2),
+  produce_marker_set_plots(emissions = emissions %>% bind_rows(cumulative.co2) %>% filter(
+    !((model=="MESSAGE") & (year<2020))
+  ),
                            climate.timeseries = climate.timeseries,
                            v = v.marker,
                            harmonization = harm.data,
-                           marker.sets = marker.sets.v20250605,
-                           low.scens = c("VLLO", "VLHO", "L", "ML", "M"),
+                           marker.sets = marker.set.final,
+                           markers.to.show = "all")
+  produce_marker_set_plots(emissions = emissions %>% bind_rows(cumulative.co2) %>% filter(
+    !((model=="MESSAGE") & (year<2020))
+  ),
+                           climate.timeseries = climate.timeseries,
+                           v = v.marker,
+                           harmonization = harm.data,
+                           marker.sets = marker.set.final,
+                           low.scens = c("VLLO", "VLHO", "L"),
                            markers.to.show = "low")
 }
+
+
+
+
+
 
 
 
@@ -2760,6 +2957,125 @@ aes(x=year,y=value,linetype=stage,
 p.set.H.HL
 
 
+
+
+
+
+## Meeting: 23.06.2025 (harmonization and climate update) ----------------------
+### TODO ----
+#' - [ ] make ERF contributions plot betweem H and M
+
+h.m.erf.diff <- climate.timeseries.erf %>% filter(percentile=="p50") %>%
+  filter(
+    target%in%c("H", "M")
+  ) %>%
+  keep_only_markers(markers = marker.set.final, v = "v20250621") %>%
+  select(climate_model,region,unit,variable,year,percentile,target,value) %>%
+  pivot_wider(names_from = target,
+              values_from = value)
+
+p.erf.diff <- ggplot(
+  h.m.erf.diff %>% filter(
+    variable %in% c(
+      "Effective Radiative Forcing|Aerosols",
+      "Effective Radiative Forcing|CH4",
+      "Effective Radiative Forcing|CO2",
+      "Effective Radiative Forcing|N2O"
+    ),
+    year>=2015
+  ) %>% iamc_variable_keep_one_level(level=-1),
+  aes(x=year)
+) +
+  facet_grid(~variable) +
+  mark_history(sy = 2025)+
+  geom_line(aes(y=H,colour="H")) +
+  geom_line(aes(y=M,colour="M")) +
+  geom_line(aes(y=H-M,colour="H minus M")) +
+  labs(title="ERF",y="W/m2") +
+  theme_jsk()
+
+save_ggplot(
+  p = p.erf.diff,
+  f = file.path(MARKER.ANALYSIS.FOLDER, "output", "H_M_ERFdiff" ),
+  h = 125,
+  w = 250,
+  bg = 'white',
+  unit = "mm"
+)
+
+p.erf.aer.diff <- ggplot(
+  h.m.erf.diff %>% filter(
+    variable %in% c(
+      "Effective Radiative Forcing|Aerosols|Direct Effect",
+      "Effective Radiative Forcing|Aerosols|Direct Effect|BC",
+      "Effective Radiative Forcing|Aerosols|Direct Effect|OC",
+      "Effective Radiative Forcing|Aerosols|Direct Effect|SOx",
+      "Effective Radiative Forcing|Aerosols|Indirect Effect"
+    ),
+    year>=2015
+  ) %>% iamc_variable_keep_two_levels(levels = c(3,4)),
+  aes(x=year)
+) +
+  facet_grid(~variable) +
+  mark_history(sy = 2025)+
+  geom_line(aes(y=H,colour="H")) +
+  geom_line(aes(y=M,colour="M")) +
+  geom_line(aes(y=H-M,colour="H minus M")) +
+  labs(title="ERF Aerosols",y="W/m2") +
+  theme_jsk()
+
+save_ggplot(
+  p = p.erf.aer.diff,
+  f = file.path(MARKER.ANALYSIS.FOLDER, "output", "H_M_aer_ERFdiff" ),
+  h = 125,
+  w = 250,
+  bg = 'white',
+  unit = "mm"
+)
+
+# ______ ----
+# ______ ----
+# ScenarioMIP documentation ----
+# ______ ----
+
+## CDR handling: Carbon Removal variables ----
+VISUALISATION.YEARS.CDR <- c(2025,2060,2100)
+cdr.total <- cdr %>% filter(variable=="Carbon Removal") %>% rename(total=value) %>%
+  select(-variable)
+cdr.shares <- cdr %>% filter(variable!="Carbon Removal") %>%
+  left_join(cdr.total) %>%
+  mutate(
+    share = value/total
+  )
+
+cdr.shares.v <- cdr.shares %>%
+  filter(target=="VLHO",ssp=="SSP2",scenario=="SSP2 - Low Overshoot",
+         variable %in% c(
+           "Carbon Removal|Enhanced Weathering",
+           "Carbon Removal|Geological Storage|Biomass",
+           "Carbon Removal|Geological Storage|Direct Air Capture",
+           "Carbon Removal|Geological Storage|Other Sources",
+           "Carbon Removal|Geological Storage|Synthetic Fuels",
+           "Carbon Removal|Land Use",
+           "Carbon Removal|Long-Lived Materials",
+           "Carbon Removal|Ocean",
+           "Carbon Removal|Other"
+         ),
+         year %in% VISUALISATION.YEARS.CDR) %>%
+  pivot_longer(cols = c(value,share), names_to = "metric", values_to = "value") %>%
+  mutate(year=as.character(year))
+
+p.cdr.shares <- ggplot(
+  cdr.shares.v,
+  aes(x=year,y=value)
+) +
+  facet_grid(metric~model, scales="free_y") +
+  geom_col(position="stack", aes(fill=variable))
+
+p.cdr.shares
+
+
+
 # ______ ----
 # ______ ----
 # IAMC abstract figures ----
@@ -3226,7 +3542,7 @@ save_ggplot(
 # Other ----
 # ______ ----
 
-## ScenarioMIP ----
+## JustMIP ----
 
 ### Peak and 2100 temps at ~800GtCO2 ----
 

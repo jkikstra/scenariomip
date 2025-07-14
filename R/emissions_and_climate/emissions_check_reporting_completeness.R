@@ -28,6 +28,23 @@ write_delim(
 
 
 # step 5: model-specific coverage of species-sector space
+MARKER.SET.FOLDER <- here("data", "marker_set", "20250713")
+df <- load_multiple_files(iamc = T,
+                                         filetype = "csv",
+                                         folder.path = MARKER.SET.FOLDER,
+                                         iamc.wide.to.long = F) %>%
+  iamc_wide_to_long(upper.to.lower = T) %>%
+  filter_begins_with("Emissions")
+df <- df %>% simplify_model_names()
+model.list <- df %>% pull(model) %>% unique()
+sector.species.list <- df %>% distinct(variable) %>%
+  add_sector_and_species_columns() %>%
+  distinct(sector,species) %>%
+  filter(
+    species %in% EMISSIONS.SPECIES.SECTORAL,
+    sector %in% SECTOR.VARIABLES.ALL
+  )
+scenarios_harmonization <- df
 
 present.or.not.template <- expand_grid(
   model.list,
@@ -50,16 +67,16 @@ for (yr in c(2020,2021,2023,2025)){
       reported = "no"
     ) %>%
 
-    # add zero in ceds info
-    left_join(
-      zero.in.ceds %>% select(-model) %>% pivot_longer(3:ncol(zero.in.ceds)-1, names_to = "species", values_to = "zero_in_ceds") %>%
-        filter(!is.na(zero_in_ceds))
-    ) %>%
-    mutate_cond(
-      ((reported=="no") & (!is.na(zero_in_ceds))), # if
-      reported = "no (but zero in CEDS)" # then
-    ) %>%
-    select(-zero_in_ceds) %>%
+    # # add zero in ceds info
+    # left_join(
+    #   zero.in.ceds %>% select(-model) %>% pivot_longer(3:ncol(zero.in.ceds)-1, names_to = "species", values_to = "zero_in_ceds") %>%
+    #     filter(!is.na(zero_in_ceds))
+    # ) %>%
+    # mutate_cond(
+    #   ((reported=="no") & (!is.na(zero_in_ceds))), # if
+    #   reported = "no (but zero in CEDS)" # then
+    # ) %>%
+    # select(-zero_in_ceds) %>%
 
     # allow peat burning to not be reported
     mutate_cond(
@@ -76,10 +93,10 @@ for (yr in c(2020,2021,2023,2025)){
     arrange(model,sector)
   present.or.not
 
-  dir.create(here("data", "data_vetting", "figures", "vetting-historical-reporting"))
+  dir.create(here("data", "data_vetting", "vetting-historical-reporting"))
   write_delim(
     x = present.or.not,
-    file = here("data", "data_vetting", "figures", "vetting-historical-reporting", paste0("variable_reporting", as.character(yr), ".csv")),
+    file = here("data", "data_vetting", "vetting-historical-reporting", paste0("variable_reporting", as.character(yr), ".csv")),
     delim = ","
   )
 }
