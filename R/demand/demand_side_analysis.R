@@ -11,6 +11,7 @@ library("ggthemes")
 library("pals")
 # library("DescTools")
 library("acid")
+library("writexl")
 
 here::i_am("scenariomip.Rproj")
 
@@ -192,36 +193,57 @@ vars.all <- c(
   vars.fe
 )
 
-
+vars.all.plus.UE <- c(vars.all,
+                      "Useful Energy",
+                      "Useful Energy|Industry",
+                      "Useful Energy|Industry|Electricity",
+                      "Useful Energy|Industry|Gases",
+                      "Useful Energy|Industry|Heat",
+                      "Useful Energy|Industry|Hydrogen",
+                      "Useful Energy|Industry|Liquids",
+                      "Useful Energy|Industry|Solids",
+                      "Useful Energy|Residential and Commercial",
+                      "Useful Energy|Residential",
+                      "Useful Energy|Commercial",
+                      "Useful Energy|Residential and Commercial|Electricity",
+                      "Useful Energy|Residential and Commercial|Gases",
+                      "Useful Energy|Residential and Commercial|Heat",
+                      "Useful Energy|Residential and Commercial|Liquids",
+                      "Useful Energy|Residential and Commercial|Solids",
+                      "Useful Energy|Transportation",
+                      "Useful Energy|Transportation|Electricity",
+                      "Useful Energy|Transportation|Gases",
+                      "Useful Energy|Transportation|Hydrogen",
+                      "Useful Energy|Transportation|Liquids" )
 # Loading IAM data ----
 # IAM_SCENARIOS_LOCATION <- here("data", "data_vetting", "scens")
 IAM_SCENARIOS_LOCATION <- "C:/Users/zaini/OneDrive - IIASA/Documents/ScenarioMIP demand"
 
 # IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-02-17.csv"
 # IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-03-05.csv" # version 'demand_world_r5_total_directvariables_v20250307_a.zip'
-IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-04-16.csv" # version presented in ScenarioMIP demand-side meeting on 13.03.2025
+IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-07-22.csv"
 
 scenarios.alldata <- load_csv_iamc(file.path(IAM_SCENARIOS_LOCATION, IAM_SCENARIOS_FILE), mode = "fast")
 
 
 # only keep relevant variables
 scenarios <- scenarios.alldata %>%
-  filter(Variable %in% vars.all)
+  filter(Variable %in% vars.all.plus.UE)
 rm(scenarios.alldata) # remove large dataframe from environment to free up RAM
 gc()
 
 # to long format
 scenarios <- scenarios %>%
   iamc_wide_to_long(upper.to.lower = T) %>%
-  filter(year <= 2100)
+  filter(year %in% seq(1990, 2100, 5))
 
 # add some extra helpful information
 scenarios <- scenarios %>%
   add_scenariomip_targets_to_IAM_scenarios() %>%
   add_ssp_basis_to_IAM_scenarios() %>%
-  simplify_model_names(keep.full.model.name = T) %>%
-  remove_scenarios_with_issues() %>% # temporary fix (which should be reported to the modelling teams)
-  remove_all_zero_values() # temporary fix (which should be reported to the modelling teams)
+  simplify_model_names(keep.full.model.name = T) #%>%
+  # remove_scenarios_with_issues() %>% # temporary fix (which should be reported to the modelling teams)
+  # remove_all_zero_values() # temporary fix (which should be reported to the modelling teams)
 
 # save some useful lists
 model.list <- scenarios %>%
@@ -233,6 +255,49 @@ model.list.simple <- scenarios %>%
   pull(model) %>%
   unique()
 
+
+vars.available.across.IAMs <- scenarios %>%
+  filter(variable %in% vars.all.plus.UE) %>%
+  summarise(
+    present = any(!is.na(value)),
+    .by    = c(variable, full.model.name)
+  ) %>%
+  # ensure every variable from vars.all shows up
+  complete(variable = vars.all.plus.UE, full.model.name) %>%
+  pivot_wider(
+    names_from  = full.model.name,
+    values_from = present
+  )
+
+write_xlsx(vars.available.across.IAMs, file.path(IAM_SCENARIOS_LOCATION, "available demand variables IAMs 22.07.25.xlsx"))
+
+### AD-HOC lines to anonymize model names
+# # Mapping in case need to anonymize model name
+#
+# model.anonymization <- c(
+#   "AIM" = "Model A",
+#   "COFFEE" = "Model B",
+#   "GCAM" = "Model C",
+#   "IMAGE" = "Model D",
+#   "MESSAGE" = "Model E",
+#   "REMIND" = "Model F",
+#   "WITCH" = "Model G"
+# )
+#
+# plot.model.colors <- c(
+#   "Model A" = "#4D5CAD",
+#   "Model B" = "#69BA7F",
+#   "Model C" = "#759EA8",
+#   "Model D" = "#868367",
+#   "Model E" = "#892F71",
+#   "Model F" = "#facb1e",
+#   "Model G" = "#fb6a4a"
+# )
+#
+# scenarios <- scenarios %>%
+#   mutate(
+#     model = recode(model, !!!model.anonymization)
+#   )
 
 # Loading other data ----
 # ...
@@ -266,6 +331,7 @@ for (v in vars.all) {
     y.unit <- plot.data %>%
       pull(unit) %>%
       unique()
+
     p <- ggplot(
       plot.data,
       aes(
@@ -295,6 +361,8 @@ for (v in vars.all) {
         linetype = guide_legend(title = NULL)
       )
 
+    p # show plot
+
     save_ggplot(
       p = p,
       h = 200,
@@ -304,10 +372,12 @@ for (v in vars.all) {
     )
 
     write_csv(plot.data, file.path(path.figures.data.activity.total, paste0("world_total_", clean_string(v), ".csv")))
+
   } else {
     print(paste0("No data reported for ", v))
   }
 }
+
 ## R5 ----
 for (v in vars.all) {
   plot.data <- scenarios %>% filter(
@@ -357,6 +427,7 @@ for (v in vars.all) {
         colour = guide_legend(title = NULL),
         linetype = guide_legend(title = NULL)
       )
+    p
 
     save_ggplot(
       p = p,
@@ -421,7 +492,7 @@ to_per_capita_scenariomip <- function(df, y.u, p.u = pop.unit) {
         value = value * mega,
         unit = "t/cap/yr"
       )
-  } else if (y.u == "bn m2") { # change in common-definitions to 'billion m2'?
+  } else if (y.u == "bn m2" || y.u == "billion m2") {
     df <- df %>%
       mutate(
         value = value * billion,
@@ -613,6 +684,7 @@ for (v in vars.all) {
           colour = guide_legend(title = NULL),
           linetype = guide_legend(title = NULL)
         )
+      p
 
       save_ggplot(
         p = p,
@@ -643,7 +715,7 @@ for (v in vars.all) {
             linetype = ssp
           )
         ) +
-        scale_color_manual(values = plot.region.colours) +
+        scale_color_manual(values = plot.region.colours.r5) +
         scale_linetype_manual(values = plot.ssp.linetypes) +
         theme_jsk() +
         theme(
@@ -686,7 +758,7 @@ for (v in vars.all) {
             linetype = target
           )
         ) +
-        scale_color_manual(values = plot.region.colours) +
+        scale_color_manual(values = plot.region.colours.r5) +
         scale_linetype_manual(values = plot.target.linetypes) +
         theme_jsk() +
         theme(
@@ -1626,7 +1698,7 @@ for (v in vars.all) {
       print(paste0("Something went wrong in calculating per capita data for ", v))
     }
   } else {
-    print(paste0("No data repoted for ", v))
+    print(paste0("No data reported for ", v))
   }
 } # end of loop over variables
 
@@ -1932,6 +2004,7 @@ for (v in vars.electrification) {
         colour = guide_legend(title = NULL),
         linetype = guide_legend(title = NULL)
       )
+    p
 
     save_ggplot(
       p = p,
@@ -1955,6 +2028,7 @@ for (v in vars.electrification) {
 
   # order data by region
   plot.data$region <- factor(plot.data$region, levels = c("Middle East & Africa (R5)", "Latin America (R5)", "Asia (R5)", "Reforming Economies (R5)", "OECD & EU (R5)", "World"))
+  plot.data$target <- factor(plot.data$target, levels = c("VLLO", "VLHO", "L", "ML", "M", "H"))
 
   if (nrow(plot.data) > 0) {
     print(paste0("Plotting ", v))
@@ -2034,11 +2108,11 @@ gdp.percap.unit <- plot.data.gdp.percap %>%
 
 
 for (v in c(
-  "Energy Service|Residential|Floor Space",
-  "Energy Service|Transportation|Freight",
-  "Energy Service|Transportation|Passenger",
-  "Stocks|Transportation|Light-Duty Vehicle",
-  "Stocks|Transportation|Light-Duty Vehicle|Battery-Electric",
+  # "Energy Service|Residential|Floor Space",
+  # "Energy Service|Transportation|Freight",
+  # "Energy Service|Transportation|Passenger",
+  # "Stocks|Transportation|Light-Duty Vehicle",
+  # "Stocks|Transportation|Light-Duty Vehicle|Battery-Electric",
   vars.electrification
 )) {
   plot.data <- scenarios %>%
@@ -2150,11 +2224,11 @@ gdp.percap.unit <- plot.data.gdp.percap %>%
   unique()
 
 for (v in c(
-  "Energy Service|Residential|Floor Space",
-  "Energy Service|Transportation|Freight",
-  "Energy Service|Transportation|Passenger",
-  "Stocks|Transportation|Light-Duty Vehicle",
-  "Stocks|Transportation|Light-Duty Vehicle|Battery-Electric",
+  # "Energy Service|Residential|Floor Space",
+  # "Energy Service|Transportation|Freight",
+  # "Energy Service|Transportation|Passenger",
+  # "Stocks|Transportation|Light-Duty Vehicle",
+  # "Stocks|Transportation|Light-Duty Vehicle|Battery-Electric",
   vars.electrification
 )) {
   plot.data <- scenarios %>%
@@ -2284,7 +2358,7 @@ to_per_unit_service_scenariomip <- function(df, var.service) {
     unique()
 
   # Correct the unit of the service, e.g. bn m2 to m2
-  if (service.unit == "bn m2") {
+  if (service.unit %in% c("bn m2", "billion m2")) {
     df <- df %>%
       mutate(value = if_else(variable == var.service, value * billion, value)) %>%
       mutate(unit = if_else(variable == var.service, "m2", unit))
@@ -2420,8 +2494,8 @@ scenarios.with.aggregations <- bind_rows(scenarios, iron_and_steel)
 
 ## choose variable to be calculated per unit of service: ----
 
-v <- "Final Energy|Residential and Commercial"
-v.service <- "Energy Service|Residential and Commercial|Floor Space"
+v <- "Final Energy|Transportation"
+v.service <- "Energy Service|Transportation|Freight"
 
 #' Final Energy variables to be calculated per unit of service:
 #' "Final Energy|Residential and Commercial",
@@ -2494,7 +2568,7 @@ if (nrow(plot.data %>% filter(variable != v.service)) > 0) { # only if you have 
         group = interaction(full.model.name, scenario, region, variable, unit)
       )
     ) +
-      facet_wrap(~target, ncol = 3) +
+      facet_wrap(~ssp, ncol = 3) +
       mark_history() +
       geom_line(
         aes(
@@ -2516,6 +2590,7 @@ if (nrow(plot.data %>% filter(variable != v.service)) > 0) { # only if you have 
         colour = guide_legend(title = NULL),
         linetype = guide_legend(title = NULL)
       )
+    p
 
     save_ggplot(
       p = p,
@@ -3749,7 +3824,7 @@ if (nrow(plot.data %>% filter(variable != v.service)) > 0) {
     print(paste0("Something went wrong in calculating per capita data for ", v))
   }
 } else {
-  print(paste0("No data repoted for ", v))
+  print(paste0("No data reported for ", v))
 }
 
 
@@ -3759,8 +3834,8 @@ if (nrow(plot.data %>% filter(variable != v.service)) > 0) {
 
 # ---- Final Energy intensity per unit of GDP ----
 
-path.figures.fe.intensity <- file.path(path.figures, "FE intensity")
-path.figures.data.fe.intensity <- file.path(path.figures.data, "FE intensity")
+path.figures.fe.intensity <- file.path(path.figures, "FE intensity per GDP")
+path.figures.data.fe.intensity <- file.path(path.figures.data, "FE intensity per GDP")
 
 if (!dir.exists(path.figures.data.fe.intensity)) {
   dir.create(path.figures.data.fe.intensity, recursive = TRUE)
@@ -3830,6 +3905,7 @@ to_per_unit_gdp_scenariomip <- function(df) {
 ## choose variable to be calculated per unit of service: ----
 
 vars.fe.intensity <- c(
+  "Final Energy",
   "Final Energy|Residential and Commercial",
   "Final Energy|Residential and Commercial|Electricity",
   "Final Energy|Transportation",
@@ -3927,6 +4003,7 @@ for (v in vars.fe.intensity) {
           colour = guide_legend(title = NULL),
           linetype = guide_legend(title = NULL)
         )
+      p
 
       save_ggplot(
         p = p,
@@ -4354,3 +4431,228 @@ for (v in vars.fe.intensity) {
     print(paste0("No data reported for ", v))
   }
 } # end of loop over vars.fe.intensity
+
+
+
+
+#---- NEAR TERM (2010-2030) AD-HOC ANALYSIS ----
+
+## Global ----
+for (v in vars.socioecon) {
+  plot.data <- scenarios %>% filter(
+    region == "World",
+    variable == v
+  )
+
+  plot.data <- plot.data %>% filter(year %in% seq(2010, 2030, 5))
+
+  # order data by scenarioMIP target scenario
+  plot.data$target <- factor(plot.data$target, levels = c("VLLO", "VLHO", "L", "ML", "M", "H"))
+
+  if (nrow(plot.data) > 0) {
+    print(paste0("Plotting ", v))
+
+    y.unit <- plot.data %>%
+      pull(unit) %>%
+      unique()
+    p <- ggplot(
+      plot.data,
+      aes(
+        x = year, y = value,
+        group = interaction(full.model.name, scenario, region, variable, unit)
+      )
+    ) +
+      facet_wrap(~target, ncol = 3) +
+      mark_history() +
+      geom_line(
+        aes(
+          colour = model,
+          linetype = ssp
+        )
+      ) +
+      scale_color_manual(values = plot.model.colors) +
+      scale_linetype_manual(values = plot.ssp.linetypes) +
+      theme_jsk() +
+      labs(
+        y = y.unit,
+        x = NULL,
+        title = v,
+        caption = paste0("File: ", IAM_SCENARIOS_FILE)
+      ) +
+      guides(
+        colour = guide_legend(title = NULL),
+        linetype = guide_legend(title = NULL)
+      )
+    p
+
+    save_ggplot(
+      p = p,
+      h = 200,
+      w = 300,
+      format = "png",
+      # f = file.path(path.figures.activity.total, paste0("world_total_", clean_string(v)))
+      f = file.path(path.figures, "nearterm_2010_2030", paste0("nearterm_world_total_", clean_string(v)))
+    )
+
+
+    # by ssp
+    p <- ggplot(
+      plot.data,
+      aes(
+        x = year, y = value,
+        group = interaction(full.model.name, scenario, region, variable, unit)
+      )
+    ) +
+      facet_wrap(~ssp, ncol = 5) +
+      mark_history() +
+      geom_line(
+        aes(
+          colour = model,
+          linetype = target
+        )
+      ) +
+      scale_color_manual(values = plot.model.colors) +
+      scale_linetype_manual(values = plot.target.linetypes) +
+      theme_jsk() +
+      labs(
+        y = y.unit,
+        x = NULL,
+        title = v,
+        caption = paste0("File: ", IAM_SCENARIOS_FILE)
+      ) +
+      guides(
+        colour = guide_legend(title = NULL),
+        linetype = guide_legend(title = NULL)
+      )
+
+    p
+
+    save_ggplot(
+      p = p,
+      h = 100,
+      w = 350,
+      format = "png",
+      # f = file.path(path.figures.activity.total, paste0("world_total_", clean_string(v)))
+      f = file.path(path.figures, "nearterm_2010_2030", paste0("nearterm_ssp_world_total_", clean_string(v)))
+    )
+
+
+    # write_csv(plot.data, file.path(path.figures.data.activity.total, paste0("world_total_", clean_string(v), ".csv")))
+  } else {
+    print(paste0("No data reported for ", v))
+  }
+}
+
+## R5 ----
+for (v in vars.socioecon) {
+  plot.data <- scenarios %>% filter(
+    (region == "World" | grepl(region, pattern = " (R5)", fixed = T)),
+    variable == v
+  )
+
+  plot.data <- plot.data %>% filter(year %in% seq(2010, 2030, 5))
+
+  # order data by scenarioMIP target scenario and by region
+  plot.data$target <- factor(plot.data$target, levels = c("VLLO", "VLHO", "L", "ML", "M", "H"))
+  plot.data$region <- factor(plot.data$region, levels = c("Middle East & Africa (R5)", "Latin America (R5)", "Asia (R5)", "Reforming Economies (R5)", "OECD & EU (R5)", "World"))
+
+
+  if (nrow(plot.data) > 0) {
+    print(paste0("Plotting ", v))
+
+    y.unit <- plot.data %>%
+      pull(unit) %>%
+      unique()
+    p <- ggplot(
+      plot.data,
+      aes(
+        x = year, y = value,
+        group = interaction(full.model.name, scenario, region, variable, unit)
+      )
+    ) +
+      facet_grid(region ~ target, scales = "free_y") +
+      mark_history() +
+      geom_line(
+        aes(
+          colour = model,
+          linetype = ssp
+        )
+      ) +
+      scale_color_manual(values = plot.model.colors) +
+      scale_linetype_manual(values = plot.ssp.linetypes) +
+      theme_jsk() +
+      theme(
+        strip.text.y = element_text(angle = 0)
+      ) +
+      labs(
+        y = y.unit,
+        x = NULL,
+        title = v,
+        caption = paste0("File: ", IAM_SCENARIOS_FILE)
+      ) +
+      guides(
+        colour = guide_legend(title = NULL),
+        linetype = guide_legend(title = NULL)
+      )
+
+    p
+
+    save_ggplot(
+      p = p,
+      h = 200,
+      w = 300,
+      format = "png",
+      f = file.path(path.figures, "nearterm_2010_2030", paste0("nearterm_r5_total_", clean_string(v)))
+    )
+
+
+    # by ssp
+
+    p <- ggplot(
+      plot.data,
+      aes(
+        x = year, y = value,
+        group = interaction(full.model.name, scenario, region, variable, unit)
+      )
+    ) +
+      facet_grid(region ~ ssp, scales = "free_y") +
+      mark_history() +
+      geom_line(
+        aes(
+          colour = model,
+          linetype = target
+        )
+      ) +
+      scale_color_manual(values = plot.model.colors) +
+      scale_linetype_manual(values = plot.target.linetypes) +
+      theme_jsk() +
+      theme(
+        strip.text.y = element_text(angle = 0)
+      ) +
+      labs(
+        y = y.unit,
+        x = NULL,
+        title = v,
+        caption = paste0("File: ", IAM_SCENARIOS_FILE)
+      ) +
+      guides(
+        colour = guide_legend(title = NULL),
+        linetype = guide_legend(title = NULL)
+      )
+
+    p
+
+    save_ggplot(
+      p = p,
+      h = 200,
+      w = 350,
+      format = "png",
+      f = file.path(path.figures, "nearterm_2010_2030", paste0("nearterm_ssp_r5_total_", clean_string(v)))
+    )
+
+
+
+  } else {
+    print(paste0("No data reported for ", v))
+  }
+}
