@@ -1102,6 +1102,7 @@ add_scenariomip_targets_to_IAM_scenarios <- function(df){
     mutate_cond(grepl(x=scenario, pattern="Medium-Low Emissions", fixed=T), target = "ML") %>%
     mutate_cond(grepl(x=scenario, pattern="Very Low Emissions", fixed=T), target = "VLLO") %>% # not the case for REMIND
     mutate_cond(grepl(x=scenario, pattern="Low Overshoot", fixed=T), target = "VLHO") %>% # not the case for REMIND
+    mutate_cond((grepl(x=scenario, pattern="SSP5 - Medium-Low Emissions_a", fixed=T) & (grepl(x=model, pattern="WITCH", fixed=T))), target = "HL") %>%
 
     return()
 }
@@ -1131,6 +1132,117 @@ remove_scenarios_with_issues <- function(df){
              # !(scenario=="..." & model=="...")
              )
   )
+}
+
+add_scenariomip_info_columns <- function(df){
+  return(
+    df %>%
+      add_scenariomip_targets_to_IAM_scenarios() %>%
+      add_ssp_basis_to_IAM_scenarios() %>%
+      simplify_model_names(keep.full.model.name = T)
+  )
+}
+
+library("fs") # for using Unix-style globs in dir_ls() like `"*.csv"`
+library("glue") # for pasting like `glue("Loaded {length(all_files)} files.")`
+load_multiple_files <- function(folder.path,
+                                iamc=TRUE,
+                                pattern=NULL,
+                                filetype="csv",
+                                upper.to.lower=F,
+                                pandas.multiindex=F,
+                                id.cols=NULL,
+                                mi.cols=NULL,
+                                magicc.percentiles.calculation=F,
+                                iamc.wide.to.long = T,
+                                ...){
+
+  # Get files matching the extension
+  all_files <- dir_ls(path = folder.path,
+                      glob = paste0("*.", filetype))
+
+  # Optionally filter by pattern
+  if (!is.null(pattern)) {
+    all_files <- all_files[str_detect(path_file(all_files), fixed(pattern))]
+  }
+
+  # Read and bind based on file type
+  if (iamc==FALSE){
+    if (pandas.multiindex==FALSE){
+      if(magicc.percentiles.calculation==FALSE){
+        df <- switch(
+          filetype,
+          "csv" = map_dfr(all_files, vroom), # bind using purr::map_dfr
+          "xlsx" = map_dfr(all_files, read_excel),# bind using purr::map_dfr
+          stop(glue::glue("Unsupported file type: {filetype}"))
+        )
+      } else {
+        df <- NULL
+        for (f in all_files){
+
+          df.f <- vroom(f) %>%
+            drop_na(run_id) %>% # drop IAM data like emissions etc.
+            # filter(variable%nin%c(
+            #   # drop some unnecessary variables
+            #   "Atmospheric Concentrations|CH4",
+            #   "Atmospheric Concentrations|CO2",
+            #   "Atmospheric Concentrations|N2O",
+            #   "CO2_CURRENT_NPP",
+            #   "Surface Air Ocean Blended Temperature Change",
+            #   "Effective Radiative Forcing|Aerosols|Direct Effect",
+            #   "Effective Radiative Forcing|Aerosols|Indirect Effect",
+            #   "Effective Radiative Forcing|Ozone",
+            #   "Effective Radiative Forcing|Solar",
+            #   "Effective Radiative Forcing|Stratospheric Ozone",
+            #   "Effective Radiative Forcing|Tropospheric Ozone",
+            #   "Effective Radiative Forcing|Volcanic",
+            #   "Heat Uptake",
+            #   "Heat Uptake|Ocean"
+            # )) %>%
+            filter(climate_model=="MAGICCv7.6.0a3") %>%
+            filter(variable%in%c(
+              "Effective Radiative Forcing|Aerosols",
+              "Effective Radiative Forcing|CO2",
+              "Effective Radiative Forcing|Greenhouse Gases",
+              "Surface Air Temperature Change", # raw GST variable in MAGICC
+              "Surface Temperature (GSAT)" # assessed temps after rescaling history
+            )) %>%
+            compute_percentiles(years = as.character(2015:2100))
+
+          df <- df %>%
+            bind_rows(
+              df.f
+            )
+        }
+      }
+
+    } else {
+
+      df <- switch(
+        filetype,
+        "csv" = map_dfr(all_files, ~flatten_multiindex_csv_new(file_path = .x, id_cols = id.cols, mi_cols = mi.cols)), # bind using purr::map_dfr
+        stop(glue::glue("Unsupported file type: {filetype}"))
+      )
+    }
+
+  } else {
+    df <- switch(
+      filetype,
+      "csv" = map_dfr(all_files, load_csv_iamc), # bind using purr::map_dfr
+      "xlsx" = map_dfr(all_files, load_excel_iamc),# bind using purr::map_dfr
+      stop(glue::glue("Unsupported file type: {filetype}"))
+    )
+    if (iamc.wide.to.long){
+      df <- df %>% iamc_wide_to_long(upper.to.lower = upper.to.lower)
+    }
+  }
+
+
+
+  # Optional: print summary
+  print(glue::glue("Loaded {length(all_files)} files. Total rows: {nrow(df)}"))
+
+  return(df)
 }
 
 ##### Adjusting "value" --------------------------------------------------------
@@ -1315,6 +1427,28 @@ constant_year_fill <- function(df,
 # }
 
 
+##### Adjusting "region" string ----------------------------------------------
+#' Keep only one level (between pipes) of the IAMC region column
+#'
+#' Note: does not check against creating duplicate region names.
+#'
+#' @param df
+#' @param level
+#'
+#' @return df with altered region column strings
+#' @export
+#'
+#' @examples
+iamc_region_keep_one_level <- function(df, level){
+
+  df <- df %>%
+    mutate(str.split = strsplit(region, "|", fixed = TRUE)) %>%
+    mutate(region = sapply(str.split,
+                             function(x) if (length(x) >= abs(level)) ifelse(level>0,x[[level]],x[[length(x)+level+1]]) else NA)) %>%
+    select(-str.split)
+
+  return(df)
+}
 
 ##### Adjusting "variable" string ----------------------------------------------
 
@@ -1385,28 +1519,6 @@ iamc_variable_keep_two_levels <- function(df, levels){
   return(df)
 }
 
-
-#' Keep only one level (between pipes) of the IAMC region column
-#'
-#' Note: does not check against creating duplicate region names.
-#'
-#' @param df
-#' @param level
-#'
-#' @return df with altered region column strings
-#' @export
-#'
-#' @examples
-iamc_region_keep_one_level <- function(df, level){
-
-  df <- df %>%
-    mutate(str.split = strsplit(region, "|", fixed = TRUE)) %>%
-    mutate(region = sapply(str.split,
-                             function(x) if (length(x) >= abs(level)) ifelse(level>0,x[[level]],x[[length(x)+level+1]]) else NA)) %>%
-    select(-str.split)
-
-  return(df)
-}
 
 
 # Load necessary libraries
