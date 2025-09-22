@@ -18,7 +18,7 @@ df1.to_csv(
 df2 = pyam.read_iiasa(
     'ssp_submission',
     model='AIM*',
-    scenario='SSP2 - Low Overshoot_b',
+    scenario='SSP2 - Low Overshoot_a',
 )
 df2.to_csv(
       os.path.join('data','marker_set','vlho.csv')

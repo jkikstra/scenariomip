@@ -24,7 +24,7 @@ source(here("R","utils.R"))
 # PATH ----
 DATA.EHH <- here("data", "ca", "20250918")
 PATH.CLIMATE.DATA <- file.path(DATA.EHH, "climate-assessment")
-MARKER.SET.FOLDER <- here("data", "marker_set", "20250921")
+MARKER.SET.FOLDER <- here("data", "marker_set", "20250922")
 MARKER.ANALYSIS.FOLDER <- file.path(DATA.EHH, "plots")
 
 
@@ -419,12 +419,12 @@ keep_only_markers <- function(df,markers,v="v1"){
 }
 
 ## [Pick marker set] ----
-v.marker <- "v20250921"
+v.marker <- "v20250922"
 marker.set.final <- climate.timeseries %>% distinct(model,scenario) %>%
   mutate(marker=NA) %>%
   mutate_cond(((model=="REMIND")&(scenario=="SSP1 - Very Low Emissions")),
               marker="VLLO") %>%
-  mutate_cond(((model=="AIM")&(scenario=="SSP2 - Low Overshoot_b")), # many options
+  mutate_cond(((model=="AIM")&(scenario=="SSP2 - Low Overshoot_a")), # many options, Shinichiro communicated his preference over email on 21.09.2025
               marker="VLHO") %>%
   mutate_cond(((model=="MESSAGE")&(scenario=="SSP2 - Low Emissions_e")), # communicated as being the current preferred option by Oliver (Slack September 19)
               marker="L") %>%
@@ -469,8 +469,9 @@ produce_marker_set_plots <- function(emissions,
   )
   h.vars <- c(
     "Cumulative Emissions|CO2|Energy and Industrial Processes",
-    # "Cumulative Emissions|CO2|AFOLU",
+    "Cumulative Emissions|CO2|AFOLU",
     "Emissions|CO2|Energy and Industrial Processes",
+    "Emissions|CO2|AFOLU",
     "Emissions|Sulfur",
     "Emissions|CH4",
     "Emissions|BC",
@@ -928,3 +929,28 @@ write_delim(
   file = file.path(MARKER.ANALYSIS.FOLDER, "harmonised_emissions.csv"),
   delim = ","
 )
+
+
+# :::::: ----
+# :::::: ----
+# Side quest into AR6 climate data ----
+AR6_CLIMATE_DATA <- vroom("C:/Users/kikstra/OneDrive - IIASA/_Other/Data/Scenario data/Scenario Databases/AR6_Scenarios_Database_World_ALL_CLIMATE_v1.1/AR6_Scenarios_Database_World_ALL_CLIMATE_v1.1.csv")
+
+erf.aer.p50 <- AR6_CLIMATE_DATA %>%
+  filter(grepl(Variable, pattern = "Effective Radiative Forcing", fixed=T)) %>%
+  filter(grepl(Variable, pattern = "Aerosols", fixed=T)) %>%
+  filter(grepl(Variable, pattern = "50.0th Percentile", fixed=T)) %>%
+  filter(!grepl(Variable, pattern = "irect", fixed=T))
+
+erf.aer.p50 %>% mutate(erf_2040_vs_2015 = `2040` - `2015`) %>%
+  mutate(emulator=ifelse(grepl(Variable, pattern="MAGICC", fixed=T), "MAGICC", "FaIR")) %>%
+  ggplot(
+    data = .,
+    aes(x = erf_2040_vs_2015)
+  ) +
+  # facet_grid(~emulator) +
+  geom_histogram(aes(colour=emulator), alpha=0,position = position_identity()) +
+  # theme_jsk() +
+  scale_x_continuous(name = "Change in ERF|Aerosols (p50) in 2040 rel. to 2015") +
+  scale_y_continuous(name = "Scenario count")
+
