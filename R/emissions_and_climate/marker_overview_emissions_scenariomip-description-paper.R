@@ -995,3 +995,24 @@ p.oc_forest_burning_africa <- ggplot(oc_forest_burning_africa %>% filter(year>=2
        subtitle = "Africa (R10)") +
   theme_jsk() + mark_history(sy = 2023)
 p.oc_forest_burning_africa
+
+afolu_africa <- marker.data %>%
+  filter_starts_with(column.name = "Variable",
+                     "Emissions") %>% filter(
+                       grepl(Variable, pattern="Emissions|OC|AFOLU",fixed=T),
+                       Region=="Africa (R10)"
+                     ) %>%
+  iamc_wide_to_long(upper.to.lower = T) %>%
+  add_scenariomip_info_columns()
+
+p.afolu_africa <- ggplot(afolu_africa %>% filter(year>=2020),
+                                     mapping=aes(x=year, y=value, colour=target)) +
+  facet_grid(variable~model, scales="free_y") +
+  geom_line(aes(group=interaction(model,scenario)), linewidth=1.3) +
+  labs(title = "Emissions|OC|AFOLU|*",
+       subtitle = "Africa (R10)") +
+  theme_jsk() + mark_history(sy = 2023)+
+  theme(
+    strip.text.y = element_text(angle = 0,hjust = 0)
+  )
+p.afolu_africa
