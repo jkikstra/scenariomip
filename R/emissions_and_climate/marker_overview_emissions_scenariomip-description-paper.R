@@ -211,6 +211,7 @@ for (m in climate.timeseries %>% pull(model) %>% unique() ){
 ### Totals (pre-processed vs harmonised; compared) -----------------------------------------------
 COMPARE.HARMONIZATION.SPECIES <- c("Emissions|CO2|Energy and Industrial Processes",
                                    "Emissions|CO2|AFOLU",
+                                   "Emissions|CO",
                                    "Emissions|CH4",
                                    "Emissions|Sulfur",
                                    "Emissions|BC",
@@ -473,6 +474,7 @@ produce_marker_set_plots <- function(emissions,
     "Emissions|CO2|Energy and Industrial Processes",
     "Emissions|CO2|AFOLU",
     "Emissions|Sulfur",
+    "Emissions|CO",
     "Emissions|CH4",
     "Emissions|BC",
     "Emissions|OC"
@@ -954,3 +956,42 @@ erf.aer.p50 %>% mutate(erf_2040_vs_2015 = `2040` - `2015`) %>%
   scale_x_continuous(name = "Change in ERF|Aerosols (p50) in 2040 rel. to 2015") +
   scale_y_continuous(name = "Scenario count")
 
+
+# :::::: ----
+# :::::: ----
+# Side quest into OC from forest burning ----
+oc_forest_burning_russia <- marker.data %>%
+  filter_starts_with(column.name = "Variable",
+                     "Emissions") %>% filter(
+                       Variable=="Emissions|OC|AFOLU|Land|Fires|Forest Burning",
+                       Region=="Reforming Economies (R10)"
+                     ) %>%
+  iamc_wide_to_long(upper.to.lower = T) %>%
+  add_scenariomip_info_columns()
+
+p.oc_forest_burning_russia <- ggplot(oc_forest_burning_russia %>% filter(year>=2020),
+                                     mapping=aes(x=year, y=value, colour=target)) +
+  facet_grid(~model) +
+  geom_line(aes(group=interaction(model,scenario)), linewidth=1.3) +
+  labs(title = "Emissions|OC|AFOLU|Land|Fires|Forest Burning",
+       subtitle = "Reforming Economies (R10)") +
+  theme_jsk() + mark_history(sy = 2023)
+p.oc_forest_burning_russia
+
+oc_forest_burning_africa <- marker.data %>%
+  filter_starts_with(column.name = "Variable",
+                     "Emissions") %>% filter(
+                       Variable=="Emissions|OC|AFOLU|Land|Fires|Forest Burning",
+                       Region=="Africa (R10)"
+                     ) %>%
+  iamc_wide_to_long(upper.to.lower = T) %>%
+  add_scenariomip_info_columns()
+
+p.oc_forest_burning_africa <- ggplot(oc_forest_burning_africa %>% filter(year>=2020),
+                                     mapping=aes(x=year, y=value, colour=target)) +
+  facet_grid(~model) +
+  geom_line(aes(group=interaction(model,scenario)), linewidth=1.3) +
+  labs(title = "Emissions|OC|AFOLU|Land|Fires|Forest Burning",
+       subtitle = "Africa (R10)") +
+  theme_jsk() + mark_history(sy = 2023)
+p.oc_forest_burning_africa
