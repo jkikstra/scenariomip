@@ -22,10 +22,24 @@ source(here("R","utils.R"))
 
 # .====. ----
 # PATH ----
-DATA.EHH <- here("data", "ca", "20250918")
-PATH.CLIMATE.DATA <- file.path(DATA.EHH, "climate-assessment")
+# Using one climate assessment versions; this is the default
+# DATA.EHH <- here("data", "ca", "20250918")
+# Using multiple climate assessment versions; not yet fully tested to work with the visualisations/data below.
+DATA.EHH.FOLDERS <- c(
+  here("data", "ca", "20250904"),
+  here("data", "ca", "20250918"),
+  # here("data", "ca", "20250924")
+  here("data", "ca", "20250925")
+)
+PATH.CLIMATE.DATA <- file.path(DATA.EHH.FOLDERS, "climate-assessment")
+get_date_string_path_climate_data <- function(p){
+  parts <- strsplit(p, "/")[[1]]
+  date_str <- parts[length(parts) - 1]
+
+  return(date_str)
+}
 MARKER.SET.FOLDER <- here("data", "marker_set", "20250922")
-MARKER.ANALYSIS.FOLDER <- file.path(DATA.EHH, "plots")
+MARKER.ANALYSIS.FOLDER <- file.path(DATA.EHH.FOLDERS, "plots")
 
 
 # .====. ----
@@ -122,48 +136,85 @@ flatten_multiindex_csv_new <- function(file_path,
 
 
 ### Warming indications -------------------------------------------------------
-warming <- load_multiple_files(folder.path = PATH.CLIMATE.DATA,
-                               iamc = F,
-                               pandas.multiindex = T,
-                               id.cols=c("climate_model", "model", "region", "scenario", "unit", "variable"),
-                               mi.cols=c("metric", "quantile"),
-                               pattern = "warming-quantiles") %>%
-  add_scenariomip_info_columns()
+warming <- NULL
+for (p in PATH.CLIMATE.DATA){
+
+  warming <- warming %>%
+    bind_rows(
+      load_multiple_files(folder.path = p,
+                          iamc = F,
+                          pandas.multiindex = T,
+                          id.cols=c("climate_model", "model", "region", "scenario", "unit", "variable"),
+                          mi.cols=c("metric", "quantile"),
+                          pattern = "warming-quantiles") %>%
+        add_scenariomip_info_columns() %>%
+        mutate(ca.version = get_date_string_path_climate_data(p))
+    )
+}
+
 
 ### Categories ----------------------------------------------------------------
-categories <- load_multiple_files(folder.path = PATH.CLIMATE.DATA,
-                                  iamc = F,
-                                  pandas.multiindex = T,
-                                  id.cols=c("climate_model", "model", "scenario"),
-                                  mi.cols=c("metric"),
-                                  pattern = "categories") %>%
-  add_scenariomip_info_columns()
+categories <- NULL
+for (p in PATH.CLIMATE.DATA){
+
+  categories <- categories %>%
+    bind_rows(
+      load_multiple_files(folder.path = p,
+                          iamc = F,
+                          pandas.multiindex = T,
+                          id.cols=c("climate_model", "model", "scenario"),
+                          mi.cols=c("metric"),
+                          pattern = "categories") %>%
+        add_scenariomip_info_columns() %>%
+        mutate(ca.version = get_date_string_path_climate_data(p))
+    )
+
+}
+
 
 ### GSAT (assessed) -----------------------------------------------------------
-climate.timeseries.gsat <- load_multiple_files(folder.path = PATH.CLIMATE.DATA,
-                                               iamc = F,
-                                               pattern = "assessed-warming") %>%
-  pivot_longer(cols = `2000`:`2100`,
-               names_to = "year",
-               values_to = "value") %>%
-  mutate(year=as.numeric(year)) %>%
-  filter(quantile%in%c(0.33,0.5,0.67)) %>%
-  mutate(percentile = paste0("p",round(x = quantile*100, digits = 0))) %>%
-  select(-quantile) %>%
-  add_scenariomip_info_columns()
+climate.timeseries.gsat <- NULL
+for (p in PATH.CLIMATE.DATA){
+
+  climate.timeseries.gsat <- climate.timeseries.gsat %>%
+    bind_rows(
+      load_multiple_files(folder.path = p,
+                                                 iamc = F,
+                                                 pattern = "assessed-warming") %>%
+      pivot_longer(cols = `2000`:`2100`,
+                   names_to = "year",
+                   values_to = "value") %>%
+      mutate(year=as.numeric(year)) %>%
+      filter(quantile%in%c(0.33,0.5,0.67)) %>%
+      mutate(percentile = paste0("p",round(x = quantile*100, digits = 0))) %>%
+      select(-quantile) %>%
+      add_scenariomip_info_columns() %>%
+      mutate(ca.version = get_date_string_path_climate_data(p))
+    )
+
+}
 
 ### ERF -----------------------------------------------------------
-climate.timeseries.erf <- load_multiple_files(folder.path = PATH.CLIMATE.DATA,
-                                              iamc = F,
-                                              pattern = "erf-timeseries") %>%
-  pivot_longer(cols = `2000`:`2100`,
-               names_to = "year",
-               values_to = "value") %>%
-  mutate(year=as.numeric(year)) %>%
-  filter(quantile%in%c(0.33,0.5,0.67)) %>%
-  mutate(percentile = paste0("p",round(x = quantile*100, digits = 0))) %>%
-  select(-quantile) %>%
-  add_scenariomip_info_columns()
+
+climate.timeseries.erf <- NULL
+for (p in PATH.CLIMATE.DATA){
+
+  climate.timeseries.erf <- climate.timeseries.erf %>%
+    bind_rows(
+      load_multiple_files(folder.path = p,
+                          iamc = F,
+                          pattern = "erf-timeseries") %>%
+        pivot_longer(cols = `2000`:`2100`,
+                     names_to = "year",
+                     values_to = "value") %>%
+        mutate(year=as.numeric(year)) %>%
+        filter(quantile%in%c(0.33,0.5,0.67)) %>%
+        mutate(percentile = paste0("p",round(x = quantile*100, digits = 0))) %>%
+        select(-quantile) %>%
+        add_scenariomip_info_columns() %>%
+        mutate(ca.version = get_date_string_path_climate_data(p))
+    )
+}
 
 ### Combine -------------------------------------------------------------------
 climate.timeseries <- climate.timeseries.gsat %>%
@@ -179,32 +230,59 @@ climate.timeseries %>% distinct(model)
 
 ### Pre-processed (SCM) -----------------------------------------------------
 pre.processed <- tibble()
-for (m in climate.timeseries %>% pull(model) %>% unique() ){
-  df.m <- load_multiple_files(folder.path = file.path(PATH.CLIMATE.DATA, "..", "emissions", m),
-                              iamc = T,
-                              pattern = "pre-processed-scms")
+for (p in PATH.CLIMATE.DATA){
+  for (m in climate.timeseries %>% pull(model) %>% unique() ){
+    path <- file.path(p, "..", "emissions", m)
+    if (!dir.exists(path)) {
+      message("Skipping missing path: ", path)
+      next
+    }
 
-  pre.processed <- pre.processed %>% bind_rows(df.m)
+    df.m <- load_multiple_files(folder.path = path,
+                                iamc = T,
+                                pattern = "pre-processed-scms") %>%
+      mutate(ca.version = get_date_string_path_climate_data(p))
+
+    pre.processed <- pre.processed %>% bind_rows(df.m)
+  }
 }
 
 ### Harmonized (SCM) --------------------------------------------------------
 harmonized <- tibble()
-for (m in climate.timeseries %>% pull(model) %>% unique() ){
-  df.m <- load_multiple_files(folder.path = file.path(PATH.CLIMATE.DATA, "..", "emissions", m),
-                              iamc = T,
-                              pattern = "harmonised-scms")
+for (p in PATH.CLIMATE.DATA){
+  for (m in climate.timeseries %>% pull(model) %>% unique() ){
+    path <- file.path(p, "..", "emissions", m)
+    if (!dir.exists(path)) {
+      message("Skipping missing path: ", path)
+      next
+    }
 
-  harmonized <- harmonized %>% bind_rows(df.m)
+    df.m <- load_multiple_files(folder.path = path,
+                                iamc = T,
+                                pattern = "harmonised-scms") %>%
+      mutate(ca.version = get_date_string_path_climate_data(p))
+
+    harmonized <- harmonized %>% bind_rows(df.m)
+  }
 }
 
 ### Infilled (SCM) -----------------------------------------------------
 infilled <- tibble()
-for (m in climate.timeseries %>% pull(model) %>% unique() ){
-  df.m <- load_multiple_files(folder.path = file.path(PATH.CLIMATE.DATA, "..", "emissions", m),
-                              iamc = T,
-                              pattern = "infilled")
+for (p in PATH.CLIMATE.DATA){
+  for (m in climate.timeseries %>% pull(model) %>% unique() ){
+    path <- file.path(p, "..", "emissions", m)
+    if (!dir.exists(path)) {
+      message("Skipping missing path: ", path)
+      next
+    }
 
-  infilled <- infilled %>% bind_rows(df.m)
+    df.m <- load_multiple_files(folder.path = path,
+                                iamc = T,
+                                pattern = "infilled") %>%
+      mutate(ca.version = get_date_string_path_climate_data(p))
+
+    infilled <- infilled %>% bind_rows(df.m)
+  }
 }
 
 
@@ -231,12 +309,12 @@ harmonization.compare.cumulative.co2 <- harmonization.compare %>% filter(
 ) %>% reframe(
   variable = "Emissions|CO2",
   value = sum(value),
-  .by = c("model", "scenario", "region", "unit", "year", "stage")
+  .by = c("model", "scenario", "region", "unit", "year", "stage", "ca.version")
 ) %>%
   filter(variable == "Emissions|CO2",
          year >= start_year) %>%
   arrange(model, scenario, region, variable, year) %>%
-  group_by(model, scenario, region, variable, unit, stage) %>%
+  group_by(model, scenario, region, variable, unit, stage, ca.version) %>%
   mutate(
     year_prev = lag(year),
     value_prev = lag(value),
@@ -264,7 +342,7 @@ harmonization.compare.cumulative.co2.split <- harmonization.compare %>% filter(
 ) %>%
   filter(year >= start_year) %>%
   arrange(model, scenario, region, variable, year) %>%
-  group_by(model, scenario, region, variable, unit, stage) %>%
+  group_by(model, scenario, region, variable, unit, stage, ca.version) %>%
   mutate(
     year_prev = lag(year),
     value_prev = lag(value),
@@ -1016,3 +1094,99 @@ p.afolu_africa <- ggplot(afolu_africa %>% filter(year>=2020),
     strip.text.y = element_text(angle = 0,hjust = 0)
   )
 p.afolu_africa
+
+
+# :::::: ----
+# :::::: ----
+# Side quest check IMAGE changes in CO harmonization ----
+
+for (c in c(
+  "Effective Radiative Forcing|Aerosols",
+  "Surface Temperature (GSAT)"
+)){
+  prefix.figure <- paste0("CO_analysis", "_", "IMAGE", "_")
+
+  c.data <- climate.timeseries %>%
+    filter(model=="IMAGE", scenario=="SSP2 - Medium Emissions") %>%
+    filter(variable==c) %>%
+    pivot_wider(names_from = percentile,
+                values_from = value)
+
+  c.data <- set_up_plotting_style_scenarios(c.data %>% mutate(marker=target))
+
+  c.var <- c.data %>% pull(variable) %>% unique()
+  c.unit <- c.data %>% pull(unit) %>% unique()
+  c.m.v <- c.data %>% pull(ca.version) %>% unique()
+
+  p.c <- ggplot(c.data %>%
+                  filter(year>=2010),
+                aes(x=year)) +
+    facet_grid(~ca.version) +
+    geom_ribbon(aes(ymin=p33,
+                    ymax=p67,
+                    group=scenario,
+                    fill=scenario),
+                alpha=0.3) +
+    geom_line(aes(y=p50,
+                  group=scenario,
+                  colour=scenario,
+                  linetype=scenario)) +
+    theme_jsk() +
+    mark_history(sy=2025)+
+    # scale_color_manual(values = TARGET.COLOURS, breaks = names(TARGET.COLOURS)) +
+    # scale_fill_manual(values = TARGET.COLOURS, breaks = names(TARGET.COLOURS)) +
+    scale_color_manual(values = scenario_colours) +
+    scale_fill_manual(values = scenario_colours) +
+    scale_linetype_manual(values = scenario_linetypes) +
+    labs(
+      title = c.var,
+      y = c.unit,
+      # caption = caption.figure,
+      colour = "Scenario",
+      fill = "Scenario",
+      linetype = "Scenario"
+    ) +
+    legend_column_wise(ncol = 2)
+  p.c
+
+
+  save_ggplot(
+    p = p.c,
+    f = file.path(MARKER.ANALYSIS.FOLDER[2], paste0(prefix.figure, "climate_", clean_string(c) ) ),
+    h = 150,
+    w = 150,
+    format = "pdf", bg = 'white',
+    unit = "mm"
+  )
+}
+
+
+# :::::: ----
+# :::::: ----
+# Side quest check REMIND VLLO submission differences ----
+compare.data <- harm.data %>%
+  filter(target=="VLLO",
+         scenario=="SSP1 - Very Low Emissions",
+         model=="REMIND")
+
+p.compare.harm.data <- ggplot(
+  compare.data,
+  aes(x=year, y=value, linetype=ca.version, colour=ca.version)
+) +
+  facet_wrap(stage~variable, scales="free_y") +
+  geom_line(aes(group=interaction(model,scenario,variable,ca.version)))
+p.compare.harm.data
+
+temp <- climate.timeseries.gsat %>%
+  filter(target=="VLLO",
+         scenario=="SSP1 - Very Low Emissions",
+         model=="REMIND")
+
+p.compare.temp <- ggplot(
+  temp %>% filter(percentile=="p50"),
+  aes(x=year, y=value, linetype=ca.version, colour=ca.version)
+) +
+  facet_wrap(percentile~variable, scales="free_y") +
+  geom_line(aes(group=interaction(model,scenario,variable,ca.version))) +
+  scale_y_continuous(breaks = c(1.1,1.2,1.3,1.4,1.5,1.6,1.7))
+p.compare.temp
