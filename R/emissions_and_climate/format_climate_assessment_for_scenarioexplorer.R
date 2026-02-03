@@ -199,7 +199,6 @@ format_climate_variables <- function(df){
     # add prefix
     mutate(variable = paste0(CLIMATE_VARIABLE_PREFIX, variable)) |>
     # merge percentile into variable name (currently working for p33, p50, p67)
-    # mutate_cond(percentile == "p33", variable = paste0(variable, "|", "33rd Percentile")) |>
     mutate_cond(percentile %in% c("p33", "p67"), variable = paste0(variable, "|", substr(percentile, 2, nchar(percentile)), "th Percentile")) |>
     mutate_cond(percentile == "p50", variable = paste0(variable, "|", "Median")) |>
     # merge climate model into variable name
@@ -250,7 +249,7 @@ combined.formatted.filtered |>
 
 
 ## Save ----
-os.makedirs(filet.path(MAIN_DATA_FOLDER_CLIMATE_ASSESSMENT, "for publication"),exist_ok=True)
+dir.create(file.path(MAIN_DATA_FOLDER_CLIMATE_ASSESSMENT, "for publication"), recursive = TRUE)
 write_xlsx(x = combined.formatted.filtered,
   path = file.path(MAIN_DATA_FOLDER_CLIMATE_ASSESSMENT, "for publication", "climate_assessment.xlsx")
 )
