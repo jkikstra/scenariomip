@@ -1143,18 +1143,87 @@ add_scenariomip_info_columns <- function(df){
   )
 }
 
+flatten_multiindex_csv_new <- function(file_path,
+                                   id_cols = NULL, #c("climate_model", "model", "scenario"),
+                                   mi_cols = NULL, #c("metric"),
+                                   collapse_string="__") {
+  # Load raw data
+  raw <- read_csv(file_path,
+                  col_names = FALSE, skip_empty_rows = FALSE)
+
+  print(id_cols)
+  print(mi_cols)
+
+
+  # Drop first row if it only contains "value"
+  if (all(raw[1, ] == "value", na.rm = TRUE)) {
+    raw <- raw[-1, ]
+  }
+
+  # Identify structure
+  b_text_rows <- which(!is.na(raw[[1]]) & is.na(raw[[2]]))
+  colname_row <- max(b_text_rows)
+
+  # Pull out how many metadata rows (i.e. rows contributing to each column name)
+  header_rows <- raw[1:colname_row, ]
+
+  # Identify where data starts
+  data <- raw[(colname_row + 2):nrow(raw), ] # adjusted
+  # data <- raw[(colname_row + 1):nrow(raw), ] # original
+  colnames(data)[1:length(id_cols)] <- id_cols
+
+  # Build full column names by collapsing metadata rows for each column
+  col_blocks <- (length(id_cols) + 1):ncol(data)
+
+  new_colnames <- map_chr(col_blocks, function(i) {
+    header_values <- header_rows[[i]]
+    header_values <- header_values[!is.na(header_values) & header_values != ""]
+    paste(header_values, collapse = collapse_string)
+  })
+
+  # Assign column names to data
+  colnames(data) <- c(id_cols, new_colnames)
+
+  # Pivot to long format
+  if(length(mi_cols)==1){
+    data_long <- data |>
+      pivot_longer(
+        cols = all_of(new_colnames),
+        names_to = as.character(mi_cols),
+        values_to = "value"
+      ) %>%
+      drop_na(value)
+  } else {
+    data_long <- data |>
+      pivot_longer(
+        cols = all_of(new_colnames),
+        names_to = "measurement",
+        values_to = "value"
+      ) |>
+      separate(
+        col = measurement,
+        into = mi_cols,#c("metric", "quantile", "year"),
+        sep = collapse_string,
+        convert = TRUE
+      ) |>
+      drop_na(value)
+  }
+
+  return(data_long)
+}
+
 library("fs") # for using Unix-style globs in dir_ls() like `"*.csv"`
 library("glue") # for pasting like `glue("Loaded {length(all_files)} files.")`
 load_multiple_files <- function(folder.path,
                                 iamc=TRUE,
                                 pattern=NULL,
                                 filetype="csv",
-                                upper.to.lower=F,
-                                pandas.multiindex=F,
-                                id.cols=NULL,
-                                mi.cols=NULL,
-                                magicc.percentiles.calculation=F,
-                                iamc.wide.to.long = T,
+                                upper.to.lower=FALSE,
+                                pandas.multiindex=FALSE,
+                                id.cols=NULL, # ID columns
+                                mi.cols=NULL, # multi-index columns
+                                magicc.percentiles.calculation=FALSE,
+                                iamc.wide.to.long = TRUE,
                                 ...){
 
   # Get files matching the extension

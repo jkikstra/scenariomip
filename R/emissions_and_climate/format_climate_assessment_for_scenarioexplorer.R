@@ -23,18 +23,25 @@ CLIMATE_VARIABLE_PREFIX <- paste0(GENERAL_VARIABLE_PREFIX)
 # MAGICC_VERSION <- 
 
 ## Climate Assessment Data ----
-MAIN_DATE <- "20260203" # date of climate assessment run
+MAIN_DATE <- "20260204" # date of climate assessment run
 VERSION_RELEASE_SCENARIOMIP <- "v0.1" # version of the data release for ScenarioMIP
 MAIN_DATA_FOLDER_CLIMATE_ASSESSMENT <- here("data", "ca", paste0(MAIN_DATE, " (release v0.1)")) # prep for first pre-release (only infilled emissions and climate outcomes)
 DATA.EHH.FOLDERS <- c(
   MAIN_DATA_FOLDER_CLIMATE_ASSESSMENT
 )
 PATH.CLIMATE.DATA <- file.path(DATA.EHH.FOLDERS, "climate-assessment")
+PATH.CLIMATE.DATA.EXCEEDANCE <- file.path(DATA.EHH.FOLDERS, "exceedance_probabilities")
+
+# Local utils ----
+get_date_string_path_climate_data <- function(p){
+  parts <- strsplit(p, "/")[[1]]
+  date_str <- parts[length(parts) - 1]
+
+  return(date_str)
+}
 
 
-
-
-# Load data ----
+# Load timeseries data ----
 
 ## Climate --------------------------------------------------------------------
 
@@ -164,6 +171,63 @@ for (p in PATH.CLIMATE.DATA){
 }
 
 
+# Load metadata ----
+
+## Warming ----
+metadata.warming <- NULL
+for (p in PATH.CLIMATE.DATA){
+  dirs = list.dirs(path = p, recursive = FALSE)
+
+  if (length(dirs) == 0) {
+    message("No subdirectories found.")
+    metadata.warming <- metadata.warming %>%
+      bind_rows(
+        load_multiple_files(folder.path = p,
+                            iamc = F,
+                            pandas.multiindex = T,
+                            id.cols=c("climate_model", "model", "region", "scenario", "unit", "variable"),
+                            mi.cols=c("metric", "quantile"),
+                            pattern = "warming-quantiles") %>%
+          mutate(value=as.numeric(value)) |> 
+          add_scenariomip_info_columns() %>%
+          mutate(ca.version = get_date_string_path_climate_data(p))
+      )
+  } else {
+    message("Subdirectories found: ", paste(basename(dirs), collapse = ", "))
+    for (d in dirs){
+      metadata.warming <- metadata.warming %>%
+        bind_rows(
+          load_multiple_files(folder.path = d,
+                              iamc = F,
+                              pandas.multiindex = T,
+                              id.cols=c("climate_model", "model", "region", "scenario", "unit", "variable"),
+                              mi.cols=c("metric", "quantile"),
+                              pattern = "warming-quantiles") %>%
+          mutate(value=as.numeric(value)) |>
+            add_scenariomip_info_columns() %>%
+            mutate(ca.version = get_date_string_path_climate_data(p))
+        )
+    }
+  }
+
+}
+
+## Exceedance Probabilities ----
+metadata.exceedance <- NULL
+for (p in PATH.CLIMATE.DATA.EXCEEDANCE){
+
+  metadata.exceedance <- metadata.exceedance %>% bind_rows(
+      load_multiple_files(folder.path = p,
+                        iamc = F,
+                        pattern = "exceedance_probabilities",
+                        iamc.wide.to.long = F) |> 
+      rename(value=`0`) |> 
+      add_scenariomip_info_columns() |> 
+      mutate(ca.version = get_date_string_path_climate_data(p))
+  )
+
+}
+
 
 # Formatting data ----
 
@@ -199,7 +263,8 @@ format_climate_variables <- function(df){
     # add prefix
     mutate(variable = paste0(CLIMATE_VARIABLE_PREFIX, variable)) |>
     # merge percentile into variable name (currently working for p33, p50, p67)
-    mutate_cond(percentile %in% c("p33", "p67"), variable = paste0(variable, "|", substr(percentile, 2, nchar(percentile)), "th Percentile")) |>
+    mutate_cond(percentile %in% c("p33"), variable = paste0(variable, "|", substr(percentile, 2, nchar(percentile)), "rd Percentile")) |>
+    mutate_cond(percentile %in% c("p67"), variable = paste0(variable, "|", substr(percentile, 2, nchar(percentile)), "th Percentile")) |>
     mutate_cond(percentile == "p50", variable = paste0(variable, "|", "Median")) |>
     # merge climate model into variable name
     mutate(variable = paste0(variable, " [", climate_model, "]")) %>%
@@ -226,13 +291,81 @@ climate.formatted <- climate.timeseries.gsat |>
 # View(climate.formatted)
 
 
+# Formatting metadata ----
+
+## Functions and constants ----
+format_warming_metadata <- function(df){
+  df |> 
+    # ensure model is full model name
+    mutate(model = full.model.name) |> 
+    
+    # rename variable, including prefix, and percentile into variable name (currently working for p33, p50, p67)
+    # - peak warming
+    mutate_cond(((metric == "max") & (variable == "Surface Temperature (GSAT)") & (quantile == 0.33)), 
+                variable = paste0(CLIMATE_VARIABLE_PREFIX, "Peak Warming|", as.character(round(quantile*100, 2)), "rd Percentile")) |>
+    mutate_cond(((metric == "max") & (variable == "Surface Temperature (GSAT)") & (quantile == 0.50)), 
+                variable = paste0(CLIMATE_VARIABLE_PREFIX, "Peak Warming|", "Median")) |>
+    mutate_cond(((metric == "max") & (variable == "Surface Temperature (GSAT)") & (quantile == 0.67)), 
+                variable = paste0(CLIMATE_VARIABLE_PREFIX, "Peak Warming|", as.character(round(quantile*100, 2)), "th Percentile")) |> 
+    # - warming in 2100
+    mutate_cond(((metric == "2100") & (variable == "Surface Temperature (GSAT)") & (quantile == 0.33)), 
+                variable = paste0(CLIMATE_VARIABLE_PREFIX, "Warming in 2100|", as.character(round(quantile*100, 2)), "rd Percentile")) |>
+    mutate_cond(((metric == "2100") & (variable == "Surface Temperature (GSAT)") & (quantile == 0.50)), 
+                variable = paste0(CLIMATE_VARIABLE_PREFIX, "Warming in 2100|", "Median")) |>
+    mutate_cond(((metric == "2100") & (variable == "Surface Temperature (GSAT)") & (quantile == 0.67)), 
+                variable = paste0(CLIMATE_VARIABLE_PREFIX, "Warming in 2100|", as.character(round(quantile*100, 2)), "th Percentile")) |> 
+    # add climate model in variable name
+    mutate(variable = paste0(variable, " [", climate_model, ", °C]")) |>  
+    
+    # unit
+    mutate_cond(unit == "K", unit = "°C") %>%
+    return()
+}
+format_exceedance_metadata <- function(df){
+  df |> 
+    # ensure model is full model name
+    mutate(model = full.model.name) |> 
+    
+    # rename variable, including prefix, and percentile into variable name (currently working for p33, p50, p67)
+    # - peak warming
+    mutate_cond((variable == "Exceedance probability"), 
+                variable = paste0(CLIMATE_VARIABLE_PREFIX, "Exceedance Probability ", format(round(threshold, digits=1), nsmall=1), "°C")) |>
+    # add climate model in variable name
+    mutate(variable = paste0(variable, " [", climate_model, ", %]")) %>% 
+    
+    return()
+}
+
+
+## Warming indicators ----
+metadata.warming.formatted <- metadata.warming |> 
+  format_warming_metadata() |> 
+  select(model,scenario,variable,unit,value,ca.version) |> 
+  select(-unit) |> # drop unit for metadata
+  pivot_wider(names_from = variable, values_from = value)
+
+# View(metadata.warming.formatted)
+
+## Exceedance probabilities ----
+metadata.exceedance.formatted <- metadata.exceedance |> 
+  format_exceedance_metadata() |> 
+  select(model,scenario,variable,unit,value,ca.version) |>  
+  select(-unit) |> # drop unit for metadata
+  pivot_wider(names_from = variable, values_from = value)
+
+
 # Combine and write out ----
 
 ## Combine ----
+### Data ----
 combined.formatted <- infilled.formatted |> 
   bind_rows(climate.formatted)
+### Metadata ----
+metadata.combined.formatted <- metadata.warming.formatted |> 
+  left_join(metadata.exceedance.formatted, by = c("model", "scenario"))
 
 ##  Rename scenarios and select scenarios ----
+### Data ----
 combined.formatted.filtered <- combined.formatted |> 
   fix_scenario_names() |> 
   filter(!is.na(new_scenario_name)) |> 
@@ -243,13 +376,24 @@ combined.formatted.filtered <- combined.formatted |>
 combined.formatted.filtered |> 
   distinct(model,scenario,new_scenario_name)
 
-## Add metadata sheet ---
+### Metadata ----
+metadata.combined.formatted.filtered <- metadata.combined.formatted |> 
+  fix_scenario_names() |> 
+  filter(!is.na(new_scenario_name)) |> 
+  filter(
+    new_scenario_name != "Medium-to-Low - SSP2 (marker)"
+  )
 
-# TBD.
+metadata.combined.formatted.filtered |> 
+  distinct(model,scenario,new_scenario_name)
 
 
 ## Save ----
 dir.create(file.path(MAIN_DATA_FOLDER_CLIMATE_ASSESSMENT, "for publication"), recursive = TRUE)
-write_xlsx(x = combined.formatted.filtered,
+writexl::write_xlsx(
+  x = list(
+    data = combined.formatted.filtered,
+    meta = metadata.combined.formatted.filtered
+  ),
   path = file.path(MAIN_DATA_FOLDER_CLIMATE_ASSESSMENT, "for publication", "climate_assessment.xlsx")
 )
