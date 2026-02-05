@@ -8,6 +8,7 @@ library("tidyverse")
 library("vroom")
 library("readxl")
 library("writexl")
+library("openxlsx")
 
 here::i_am("scenariomip.Rproj")
 
@@ -15,15 +16,16 @@ source(here("R","utils.R"))
 
 # Define paths and constants ----
 
+
 ## Constants for format for Scenario Explorer ----
 GENERAL_VARIABLE_PREFIX <- "Climate Assessment|"
-INFILLING_VARIABLE_PREFIX <- paste0(GENERAL_VARIABLE_PREFIX, "Infilled|")
+INFILLING_VARIABLE_PREFIX <- paste0(GENERAL_VARIABLE_PREFIX, "Harmonized and Infilled|")
 CLIMATE_VARIABLE_PREFIX <- paste0(GENERAL_VARIABLE_PREFIX)
 
 # MAGICC_VERSION <- 
 
 ## Climate Assessment Data ----
-MAIN_DATE <- "20260204" # date of climate assessment run
+MAIN_DATE <- "20260205" # date of climate assessment run
 VERSION_RELEASE_SCENARIOMIP <- "v0.1" # version of the data release for ScenarioMIP
 MAIN_DATA_FOLDER_CLIMATE_ASSESSMENT <- here("data", "ca", paste0(MAIN_DATE, " (release v0.1)")) # prep for first pre-release (only infilled emissions and climate outcomes)
 DATA.EHH.FOLDERS <- c(
@@ -31,6 +33,14 @@ DATA.EHH.FOLDERS <- c(
 )
 PATH.CLIMATE.DATA <- file.path(DATA.EHH.FOLDERS, "climate-assessment")
 PATH.CLIMATE.DATA.EXCEEDANCE <- file.path(DATA.EHH.FOLDERS, "exceedance_probabilities")
+
+## Output ----
+PUBLICATION_FOLDER <- file.path(MAIN_DATA_FOLDER_CLIMATE_ASSESSMENT, "for publication")
+FINAL_DATA_FILE <- file.path(PUBLICATION_FOLDER, "climate_assessment.xlsx")
+
+## README sheet ----
+# README_FILE_PATH <- file.path(MAIN_DATA_FOLDER_CLIMATE_ASSESSMENT, "climate_assessment_with_manual_readme_example.xlsx")
+# Do manually, because formatting does not work nicely when copying over.
 
 # Local utils ----
 get_date_string_path_climate_data <- function(p){
@@ -238,13 +248,13 @@ fix_scenario_names <- function(df){
     # general renaming
     # tbd...
     # markers
-    mutate_cond(model == "AIM 3.0" & scenario == "SSP2 - Low Overshoot_a", new_scenario_name = "Low-to-Negative - SSP2 (marker)") |>
-    mutate_cond(model == "REMIND-MAgPIE 3.5-4.11" & scenario == "SSP1 - Very Low Emissions", new_scenario_name = "Very Low - SSP1 (marker)") |>
-    mutate_cond(model == "MESSAGEix-GLOBIOM-GAINS 2.1-M-R12" & scenario == "SSP2 - Low Emissions", new_scenario_name = "Low - SSP2 (marker)") |>
-    mutate_cond(model == "COFFEE 1.6" & scenario == "SSP2 - Medium-Low Emissions", new_scenario_name = "Medium-to-Low - SSP2 (marker)") |>
-    mutate_cond(model == "IMAGE 3.4" & scenario == "SSP2 - Medium Emissions", new_scenario_name = "Medium - SSP2 (marker)") |>
-    mutate_cond(model == "WITCH 6.0" & scenario == "SSP5 - Medium-Low Emissions_a", new_scenario_name = "High-to-Low - SSP5 (marker)") |>
-    mutate_cond(model == "GCAM 8s" & scenario == "SSP3 - High Emissions", new_scenario_name = "High - SSP3 (marker)") %>%
+    mutate_cond(model == "AIM 3.0" & scenario == "SSP2 - Low Overshoot_a", new_scenario_name = "Low-to-Negative - SSP2 (Marker)") |>
+    mutate_cond(model == "REMIND-MAgPIE 3.5-4.11" & scenario == "SSP1 - Very Low Emissions", new_scenario_name = "Very Low - SSP1 (Marker)") |>
+    mutate_cond(model == "MESSAGEix-GLOBIOM-GAINS 2.1-M-R12" & scenario == "SSP2 - Low Emissions", new_scenario_name = "Low - SSP2 (Marker)") |>
+    mutate_cond(model == "COFFEE 1.6" & scenario == "SSP2 - Medium-Low Emissions", new_scenario_name = "Medium-to-Low - SSP2 (Marker)") |>
+    mutate_cond(model == "IMAGE 3.4" & scenario == "SSP2 - Medium Emissions", new_scenario_name = "Medium - SSP2 (Marker)") |>
+    mutate_cond(model == "WITCH 6.0" & scenario == "SSP5 - Medium-Low Emissions_a", new_scenario_name = "High-to-Low - SSP5 (Marker)") |>
+    mutate_cond(model == "GCAM 8s" & scenario == "SSP3 - High Emissions", new_scenario_name = "High - SSP3 (Marker)") %>%
     return()
 }
 format_emissions_variables <- function(df){
@@ -362,7 +372,7 @@ combined.formatted <- infilled.formatted |>
   bind_rows(climate.formatted)
 ### Metadata ----
 metadata.combined.formatted <- metadata.warming.formatted |> 
-  left_join(metadata.exceedance.formatted, by = c("model", "scenario"))
+  left_join(metadata.exceedance.formatted, by = c("model", "scenario", "ca.version"))
 
 ##  Rename scenarios and select scenarios ----
 ### Data ----
@@ -370,7 +380,7 @@ combined.formatted.filtered <- combined.formatted |>
   fix_scenario_names() |> 
   filter(!is.na(new_scenario_name)) |> 
   filter(
-    new_scenario_name != "Medium-to-Low - SSP2 (marker)"
+    new_scenario_name != "Medium-to-Low - SSP2 (Marker)"
   )
 
 combined.formatted.filtered |> 
@@ -381,19 +391,135 @@ metadata.combined.formatted.filtered <- metadata.combined.formatted |>
   fix_scenario_names() |> 
   filter(!is.na(new_scenario_name)) |> 
   filter(
-    new_scenario_name != "Medium-to-Low - SSP2 (marker)"
+    new_scenario_name != "Medium-to-Low - SSP2 (Marker)"
   )
 
 metadata.combined.formatted.filtered |> 
   distinct(model,scenario,new_scenario_name)
 
 
+
+## FINAL ADJUTSMENTS FORMATTING ----
+final_formatting_fixes <- function(df, type="meta"){
+  df <- df |> 
+    mutate(scenario = new_scenario_name) |> select(-new_scenario_name) |> 
+    rename(`Version Climate Assessment` = ca.version) 
+  if(type=="data"){
+    df <- df |> 
+      select(-`Version Climate Assessment`) |>
+      arrange(model,scenario,region,variable,unit,year) |> 
+      pivot_wider(values_from=value, names_from=year)
+  }
+
+  return(df)
+}
+
+### Data ----
+combined.formatted.filtered.iamc <- combined.formatted.filtered |> 
+  final_formatting_fixes(type="data")
+
+### Metadata ----
+metadata.combined.formatted.filtered.iamc <- metadata.combined.formatted.filtered |> 
+  final_formatting_fixes(type="meta")
+
+### README ----
+# copy_readme_sheet <- function(source_file, target_file) {
+#   # Load source workbook
+#   source_wb <- loadWorkbook(source_file)
+
+#   if (!"README" %in% names(source_wb)) {
+#     stop("Sheet 'README' not found in source workbook.")
+#   }
+
+#   # Read README from source
+#   readme <- readWorkbook(
+#     source_wb,
+#     sheet = "README",
+#     colNames = FALSE
+#   )
+
+#   # Read all sheets from target
+#   target_sheets <- excel_sheets(target_file)
+
+#   other_sheets <- lapply(
+#     setdiff(target_sheets, "README"),
+#     \(s) readWorkbook(target_file, sheet = s)
+#   )
+#   names(other_sheets) <- setdiff(target_sheets, "README")
+
+#   # Rebuild workbook with README first
+#   write.xlsx(
+#     x = c(list(README = readme), other_sheets),
+#     file = target_file,
+#     overwrite = TRUE
+#   )
+# }
+# Try:
+# library(openxlsx) # newer version
+# copy_readme_sheet <- function(source_file, target_file) {
+#   # Load workbooks
+#   source_wb <- loadWorkbook(source_file)
+#   target_wb <- loadWorkbook(target_file)
+
+#   if (!"README" %in% names(source_wb)) {
+#     stop("Sheet 'README' not found in source workbook.")
+#   }
+
+#   # Remove existing README if present
+#   if ("README" %in% names(target_wb)) {
+#     removeWorksheet(target_wb, "README")
+#   }
+
+#   # Copy sheet
+#   addWorksheet(target_wb, "README", position = 1)
+#   copyWorksheet(
+#     fromWorkbook = source_wb,
+#     fromSheet = "README",
+#     toWorkbook   = target_wb,
+#     toSheet      = "README"
+#   )
+
+#   saveWorkbook(target_wb, target_file, overwrite = TRUE)
+# }
+
+
+
 ## Save ----
-dir.create(file.path(MAIN_DATA_FOLDER_CLIMATE_ASSESSMENT, "for publication"), recursive = TRUE)
+dir.create(PUBLICATION_FOLDER, recursive = TRUE)
 writexl::write_xlsx(
   x = list(
-    data = combined.formatted.filtered,
-    meta = metadata.combined.formatted.filtered
+    data = combined.formatted.filtered.iamc,
+    meta = metadata.combined.formatted.filtered.iamc
   ),
-  path = file.path(MAIN_DATA_FOLDER_CLIMATE_ASSESSMENT, "for publication", "climate_assessment.xlsx")
+  path = FINAL_DATA_FILE 
 )
+# copy_readme_sheet(
+#   source_file = README_FILE_PATH,
+#   target_file = FINAL_DATA_FILE
+# )
+
+# Checks ----
+library("testthat")
+testthat::test_that(
+  "No duplicates in data",{
+
+  expect_equal(
+    combined.formatted.filtered.iamc |> nrow(),
+    combined.formatted.filtered.iamc |> distinct(model,scenario,region,variable,unit) |> nrow(),
+    # tolerance = 1e-10,
+    label = "Duplicates in data"
+  )
+}
+)
+testthat::test_that(
+  "No duplicates in meta",{
+
+  expect_equal(
+    metadata.combined.formatted.filtered.iamc |> nrow(),
+    metadata.combined.formatted.filtered.iamc |> distinct(model,scenario) |> nrow(),
+    # tolerance = 1e-10,
+    label = "Duplicates in meta"
+  )
+}
+)
+
