@@ -545,3 +545,41 @@ save_ggplot(
   h = 150, w = 250
 )
 
+
+## Medium CMIP7 vs Medium CMIP6 (CH4) ----
+p.global.cmip7.cmip6.medium.ch4 <- ggplot(
+  cmip7.scenarios.global |> filter(variable=="CH4", scenario%in%c("M", "ML")) |>
+    add_facet_label(),
+  aes(x = year, y = value)
+) +
+  facet_wrap(~facet_label, scales = "free_y", nrow = 1) +
+  geom_hline(yintercept=0, linetype = "dotted") +
+  geom_line(
+    data = cmip6.scenarios.global |> filter(variable=="CH4", scenario%in%c("SSP2-45")) %>% add_facet_label(),
+    aes(colour=scenario, group = interaction(model, scenario)),
+    linetype="dotted",
+    linewidth=1.1
+  ) +
+  geom_line(
+    aes(colour=scenario, group = interaction(model, scenario)),
+    linewidth=1.2
+  ) +
+  geom_line(
+    data = cmip7.history %>% filter(variable=="CH4", year>=1990),
+    aes(group = interaction(scenario)),
+    linewidth=1.3,
+    colour="black"
+  ) +
+  scale_color_manual(breaks=c(SCENARIOS.7,SCENARIOS.6),values=c(SCENARIOS.7.COLOURS, SCENARIOS.6.COLOURS)) +
+  scale_x_continuous(limits = c(2010,2100),expand = c(0,0)) +
+  theme_jsk() +
+  mark_history(sy = 2025) +
+  labs(y = NULL) +
+  theme(legend.title = element_blank(),
+        legend.position = "right")
+p.global.cmip7.cmip6.medium.ch4
+save_ggplot(
+  p = p.global.cmip7.cmip6.medium.ch4,
+  f = here("figures", "cmip6_vs_cmip7_medium_ch4"),
+  h = 150, w = 250
+)
