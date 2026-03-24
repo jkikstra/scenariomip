@@ -637,3 +637,550 @@ save_ggplot(
   f = here("figures", "cmip6_vs_cmip7_medium_ch4"),
   h = 150, w = 250
 )
+## Medium CMIP7 vs Medium CMIP6 (N2O) ----
+p.global.cmip7.cmip6.medium.n2o <- ggplot(
+  cmip7.scenarios.global |> filter(variable=="N2O", scenario%in%c("M", "ML")) |>
+    add_facet_label(),
+  aes(x = year, y = value)
+) +
+  facet_wrap(~facet_label, scales = "free_y", nrow = 1) +
+  geom_hline(yintercept=0, linetype = "dotted") +
+  geom_line(
+    data = cmip6.scenarios.global |> filter(variable=="N2O", scenario%in%c("SSP2-45")) %>% add_facet_label(),
+    aes(colour=scenario, group = interaction(model, scenario)),
+    linetype="dotted",
+    linewidth=1.1
+  ) +
+  geom_line(
+    aes(colour=scenario, group = interaction(model, scenario)),
+    linewidth=1.2
+  ) +
+  geom_line(
+    data = cmip7.history %>% filter(variable=="N2O", year>=1990),
+    aes(group = interaction(scenario)),
+    linewidth=1.3,
+    colour="black"
+  ) +
+  scale_color_manual(breaks=c(SCENARIOS.7,SCENARIOS.6),values=c(SCENARIOS.7.COLOURS, SCENARIOS.6.COLOURS)) +
+  scale_x_continuous(limits = c(2010,2100),expand = c(0,0)) +
+  theme_jsk() +
+  mark_history(sy = 2025) +
+  labs(y = NULL) +
+  theme(legend.title = element_blank(),
+        legend.position = "right")
+p.global.cmip7.cmip6.medium.n2o
+save_ggplot(
+  p = p.global.cmip7.cmip6.medium.n2o,
+  f = here("figures", "cmip6_vs_cmip7_medium_n2o"),
+  h = 150, w = 250
+)
+
+
+
+# Country-level: only CMIP7 ----
+
+## China: CO2 emissions ----
+p.global.cmip7.china <- ggplot(
+  cmip7.scenarios.china |> filter(gas=="CO2") %>%
+    rename(variable=gas) %>%
+    select(-method,-region) %>%
+    rename(region=country) %>%
+    pivot_longer(
+      cols = `2023`:`2100`,
+      names_to = "year",
+      values_to = "value"
+    ) %>%
+    drop_na(value) %>%
+    mutate(year = as.numeric(year)) %>%
+    reframe(
+      value = sum(value),
+      .by = c(model,scenario,region,variable,unit,year)
+    ) %>%
+    mutate_cond(scenario=="SSP1 - Very Low Emissions",scenario="VL") %>%
+    mutate_cond(scenario=="SSP2 - Low Overshoot_a",scenario="LN") %>%
+    mutate_cond(scenario=="SSP2 - Low Emissions",scenario="L") %>%
+    mutate_cond(scenario=="SSP2 - Medium-Low Emissions",scenario="ML") %>%
+    mutate_cond(scenario=="SSP2 - Medium Emissions",scenario="M") %>%
+    mutate_cond(scenario=="SSP5 - Medium-Low Emissions_a",scenario="HL") %>%
+    mutate_cond(scenario=="SSP3 - High Emissions",scenario="H"),
+  aes(x = year, y = value/1e3)
+) +
+  facet_wrap(~variable, scales = "free_y", nrow = 1) +
+  geom_hline(yintercept=0, linetype = "dotted") +
+  geom_line(data=cmip7.history.chn %>%
+              filter(unit == "Mt CO2/yr") %>%
+              mutate(variable="CO2") %>%
+              reframe(
+                value=sum(value),
+                .by = c(scenario,region,variable,unit,year)
+              ) %>% filter(year>=2000),
+            colour="black",
+            linewidth=1.3) +
+  geom_line(
+    aes(colour=scenario, group = interaction(model, scenario)),
+    linewidth=1.2
+  ) +
+  # geom_line(
+  #   data = cmip7.history %>% filter(variable=="CO2", year>=1990),
+  #   aes(group = interaction(scenario)),
+  #   linewidth=1.3,
+  #   colour="black"
+  # ) +
+  scale_color_manual(breaks=SCENARIOS.7,values=SCENARIOS.7.COLOURS) +
+  scale_x_continuous(limits = c(2010,2100),expand = c(0,0)) +
+  theme_jsk() +
+  mark_history(sy = 2025) +
+  labs(y = "GtCO2/yr") +
+  theme(legend.title = element_blank(),
+        legend.position = "right")
+p.global.cmip7.china
+save_ggplot(
+  p = p.global.cmip7.china + theme(legend.position="none"),
+  f = here("figures", "cmip7_china_co2"),
+  h = 150, w = 230
+)
+## China: SO2 emissions ----
+p.global.cmip7.china.so2 <- ggplot(
+  cmip7.scenarios.china |> filter(gas=="SO2") %>%
+    rename(variable=gas) %>%
+    select(-method,-region) %>%
+    rename(region=country) %>%
+    pivot_longer(
+      cols = `2023`:`2100`,
+      names_to = "year",
+      values_to = "value"
+    ) %>%
+    drop_na(value) %>%
+    mutate(year = as.numeric(year)) %>%
+    reframe(
+      value = sum(value),
+      .by = c(model,scenario,region,variable,unit,year)
+    ) %>%
+    mutate_cond(scenario=="SSP1 - Very Low Emissions",scenario="VL") %>%
+    mutate_cond(scenario=="SSP2 - Low Overshoot_a",scenario="LN") %>%
+    mutate_cond(scenario=="SSP2 - Low Emissions",scenario="L") %>%
+    mutate_cond(scenario=="SSP2 - Medium-Low Emissions",scenario="ML") %>%
+    mutate_cond(scenario=="SSP2 - Medium Emissions",scenario="M") %>%
+    mutate_cond(scenario=="SSP5 - Medium-Low Emissions_a",scenario="HL") %>%
+    mutate_cond(scenario=="SSP3 - High Emissions",scenario="H"),
+  aes(x = year, y = value/1e3)
+) +
+  facet_wrap(~variable, scales = "free_y", nrow = 1) +
+  geom_hline(yintercept=0, linetype = "dotted") +
+  geom_line(data=cmip7.history.chn %>%
+              filter(unit == "Mt SO2/yr") %>%
+              mutate(variable="SO2") %>%
+              reframe(
+                value=sum(value),
+                .by = c(scenario,region,variable,unit,year)
+              ) %>% filter(year>=2000),
+            colour="black",
+            linewidth=1.3) +
+  geom_line(
+    aes(colour=scenario, group = interaction(model, scenario)),
+    linewidth=1.2
+  ) +
+  # geom_line(
+  #   data = cmip7.history %>% filter(variable=="CO2", year>=1990),
+  #   aes(group = interaction(scenario)),
+  #   linewidth=1.3,
+  #   colour="black"
+  # ) +
+  scale_color_manual(breaks=SCENARIOS.7,values=SCENARIOS.7.COLOURS) +
+  scale_x_continuous(limits = c(2010,2100),expand = c(0,0)) +
+  theme_jsk() +
+  mark_history(sy = 2025) +
+  labs(y = "GtCO2/yr") +
+  theme(legend.title = element_blank(),
+        legend.position = "right")
+p.global.cmip7.china.so2
+save_ggplot(
+  p = p.global.cmip7.china.so2 + theme(legend.position="none"),
+  f = here("figures", "cmip7_china_so2"),
+  h = 150, w = 230
+)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# QUICCA: example of UPDATE / EXTENSION / HARMONIZATION / NEW SCENARIOS ----
+
+## Idea ----
+# - Col 1: CMIP6-standard
+# - Row 1: extension (WP4)
+#   * col 2: CMIP6-like + additional year, no scenarios
+#   * col 3: CMIP6-like + additional year, scenarios reharmonized
+# - Row 2: extension (WP4)
+#   * col 2: CMIP6-like + CMIP7 history (scenarios old CMIP6 harmonization)
+#   * col 3: CMIP7-like, scenarios reharmonized
+# - Row 3: new scenarios (not in QUICCA)
+#   * col 2: ...
+#   * col 3: ...
+
+
+## Data ----
+
+### History ----
+hist.cmip6 <- read_csv(
+  "C:/Users/kikstra/Downloads/history_ar6.csv"
+) %>%
+  iamc_wide_to_long(upper.to.lower = T) %>% select(-model) %>%
+  filter(year>=1990,
+         variable=="AR6 climate diagnostics|Emissions|CO2|Unharmonized") %>%
+  mutate(variable="CO2",unit="Gt CO2/yr",value=value/1e3)
+
+hist.cmip6.extension <- hist.cmip6 %>% bind_rows(
+  hist.cmip6 %>% filter(year==2015) %>% mutate(year=2016,value=value*extension.adjustment.factor)
+) %>% distinct()
+
+hist.cmip7 <- cmip7.history %>% filter(variable=="CO2", year>=1990)
+
+
+### Scenarios ----
+extension.new.year <- 2016
+extension.adjustment.factor <- 1.10
+harmonization.final.convergence.year <- 2040
+
+update.new.year <- 2023
+update.adjustment.factor <- (
+  hist.cmip7 %>% filter(year==2023) %>% pull(value)
+) / (
+  hist.cmip6 %>% filter(year==2015) %>% pull(value)
+)
+# harmonization.final.convergence.year <- 2040
+
+scen.cmip6 <- cmip6.scenarios.global |> filter(variable=="CO2") %>% add_facet_label() %>%
+  filter(scenario %in% c("SSP1-19", "SSP2-45", "SSP5-85"))
+
+scen.cmip6.extension <- scen.cmip6 %>%
+  bind_rows(
+    # add a 2016 timepoint
+    scen.cmip6 %>% filter(year==2015) %>% mutate(year=2016,value=value*extension.adjustment.factor)
+  ) %>%
+  distinct() %>% arrange(model,scenario,region,variable,unit,year) %>%
+  mutate_cond(year>extension.new.year & year<harmonization.final.convergence.year,
+              value=value*(1 + (extension.adjustment.factor - 1) *
+                             (harmonization.final.convergence.year - year) /
+                             (harmonization.final.convergence.year - extension.new.year))) %>%
+  mutate_cond(year>=harmonization.final.convergence.year, value=value) %>%
+  filter(year>=extension.new.year)
+
+scen.cmip6.updated <- scen.cmip6 %>%
+  bind_rows(
+    # add a 2016 timepoint
+    scen.cmip6 %>% filter(year==2015) %>% mutate(year=2023,value=value*update.adjustment.factor)
+  ) %>%
+  filter(year>=2023) %>%
+  distinct() %>% arrange(model,scenario,region,variable,unit,year) %>%
+  mutate_cond(year>update.new.year & year<harmonization.final.convergence.year,
+              value=value*(1 + (update.adjustment.factor - 1) *
+                             (harmonization.final.convergence.year - year) /
+                             (harmonization.final.convergence.year - update.new.year))) %>%
+  mutate_cond(year>=harmonization.final.convergence.year, value=value) %>%
+  filter(year>=update.new.year)
+
+scen.cmip7 <- cmip7.scenarios.global |> filter(variable=="CO2") |> add_facet_label() %>%
+  filter(scenario %in% c("VL", "ML", "H"))
+
+
+## Plots ----
+
+### Column 1 ----
+c1 <- ggplot(
+  scen.cmip7,
+  aes(x = year, y = value)
+) +
+  # facet_wrap(~facet_label, scales = "free_y", nrow = 1) +
+  geom_line(
+    data = scen.cmip6,
+    aes(colour=scenario,group = interaction(model, scenario)),
+    linewidth=1.1
+  ) +
+  geom_line(
+    data = hist.cmip6,
+    aes(group = interaction(scenario)),
+    linewidth=1.3,
+    colour="black"
+  ) +
+  scale_color_manual(breaks=SCENARIOS.6,values=SCENARIOS.6.COLOURS) +
+  coord_cartesian(xlim = c(2005,2035), ylim = c(15,65)) +
+  scale_x_continuous(breaks=seq(2005,2035,5)) +
+  theme_jsk() +
+  mark_history(sy = 2015) +
+  labs(y = "Gt CO2/yr",
+       title = "CMIP Phase") +
+  theme(legend.title = element_blank(),
+        legend.position = "right")
+c1
+
+### Row 1 ----
+
+
+r1c2 <- ggplot(
+  scen.cmip7,
+  aes(x = year, y = value)
+) +
+  # facet_wrap(~facet_label, scales = "free_y", nrow = 1) +
+  # geom_line(
+  #   data = scen.cmip6,
+  #   aes(colour=scenario,group = interaction(model, scenario)),
+  #   linewidth=1.1
+  # ) +
+  geom_line(
+    data = hist.cmip6,
+    aes(group = interaction(scenario)),
+    linewidth=1.3,
+    colour="darkgrey"
+  ) +
+  geom_line(
+    data = hist.cmip6.extension %>% filter(year>=2015),
+    aes(group = interaction(scenario)),
+    linewidth=1.3,
+    colour="black"
+  ) +
+
+  scale_color_manual(breaks=SCENARIOS.6,values=SCENARIOS.6.COLOURS) +
+  coord_cartesian(xlim = c(2005,2035), ylim = c(15,65)) +
+  scale_x_continuous(breaks=seq(2005,2035,5)) +
+  theme_jsk() +
+  mark_history(sy = 2015) +
+  labs(y = "Gt CO2/yr",
+       title = expression(bold(Extension) ~ "of history")) +
+  theme(legend.title = element_blank(),
+        legend.position = "right")
+r1c2
+
+r1c3 <- ggplot(
+  scen.cmip7,
+  aes(x = year, y = value)
+) +
+  # facet_wrap(~facet_label, scales = "free_y", nrow = 1) +
+  geom_line(
+    data = scen.cmip6,
+    aes(colour=scenario,group = interaction(model, scenario)),
+    linewidth=0.9,
+    # colour="grey",
+    linetype="dashed"
+  ) +
+  geom_line(
+    data = scen.cmip6.extension,
+    aes(colour=scenario,group = interaction(model, scenario)),
+    linewidth=1.1
+  ) +
+  geom_line(
+    data = hist.cmip6,
+    aes(group = interaction(scenario)),
+    linewidth=1.3,
+    colour="darkgrey"
+  ) +
+  geom_line(
+    data = hist.cmip6.extension %>% filter(year>=2015),
+    aes(group = interaction(scenario)),
+    linewidth=1.3,
+    colour="black"
+  ) +
+
+  scale_color_manual(breaks=SCENARIOS.6,values=SCENARIOS.6.COLOURS) +
+  coord_cartesian(xlim = c(2005,2035), ylim = c(15,65)) +
+  scale_x_continuous(breaks=seq(2005,2035,5)) +
+  theme_jsk() +
+  mark_history(sy = 2015) +
+  labs(y = "Gt CO2/yr",
+       title = "Reharmonization") +
+  theme(legend.title = element_blank(),
+        legend.position = "right")
+
+r1c3
+
+### Row 2 ----
+
+r2c2 <- ggplot(
+  scen.cmip7,
+  aes(x = year, y = value)
+) +
+  # facet_wrap(~facet_label, scales = "free_y", nrow = 1) +
+  # geom_line(
+  #   data = scen.cmip6,
+  #   aes(colour=scenario,group = interaction(model, scenario)),
+  #   linewidth=1.1
+  # ) +
+  geom_line(
+    data = hist.cmip6,
+    aes(group = interaction(scenario)),
+    linewidth=0.9,
+    colour="darkgrey",
+    linetype="dashed"
+  ) +
+  geom_line(
+    data = hist.cmip7,
+    aes(group = interaction(scenario)),
+    linewidth=1.3,
+    colour="black"
+  ) +
+
+  scale_color_manual(breaks=SCENARIOS.6,values=SCENARIOS.6.COLOURS) +
+  coord_cartesian(xlim = c(2005,2035), ylim = c(15,65)) +
+  scale_x_continuous(breaks=seq(2005,2035,5)) +
+  theme_jsk() +
+  mark_history(sy = 2015) +
+  labs(y = "Gt CO2/yr",
+       title = expression(bold(Update) ~ "of history")) +
+  theme(legend.title = element_blank(),
+        legend.position = "right")
+r2c2
+
+r2c3 <- ggplot(
+  scen.cmip7,
+  aes(x = year, y = value)
+) +
+  # facet_wrap(~facet_label, scales = "free_y", nrow = 1) +
+  geom_line(
+    data = scen.cmip6,
+    aes(colour=scenario,group = interaction(model, scenario)),
+    linewidth=0.9,
+    # colour="grey",
+    linetype="dashed"
+  ) +
+  geom_line(
+    data = scen.cmip6.updated,
+    aes(colour=scenario,group = interaction(model, scenario)),
+    linewidth=1.1
+  ) +
+  geom_line(
+    data = hist.cmip6,
+    aes(group = interaction(scenario)),
+    linewidth=0.9,
+    colour="darkgrey",
+    linetype="dashed"
+  ) +
+  geom_line(
+    data = hist.cmip7,
+    aes(group = interaction(scenario)),
+    linewidth=1.3,
+    colour="black"
+  ) +
+
+  scale_color_manual(breaks=SCENARIOS.6,values=SCENARIOS.6.COLOURS) +
+  coord_cartesian(xlim = c(2005,2035), ylim = c(15,65)) +
+  scale_x_continuous(breaks=seq(2005,2035,5)) +
+  theme_jsk() +
+  mark_history(sy = 2015) +
+  labs(y = "Gt CO2/yr",
+       title = "Reharmonization") +
+  theme(legend.title = element_blank(),
+        legend.position = "right")
+
+r2c3
+
+### Row 3 (TBD) ----
+r3c2 <- ggplot() + theme_void()
+
+r3c3 <- ggplot(
+  scen.cmip7,
+  aes(x = year, y = value)
+) +
+  facet_wrap(~facet_label, scales = "free_y", nrow = 1) +
+  geom_hline(yintercept=0, linetype = "dotted") +
+  geom_line(
+    data = hist.cmip6,
+    aes(group = interaction(scenario)),
+    linewidth=0.9,
+    linetype="dashed",
+    colour="darkgrey"
+  ) +
+  geom_line(
+    data = scen.cmip6,
+    aes(group = interaction(model, scenario)),
+    colour="darkgrey",
+    linetype="dashed",
+    linewidth=0.9
+  ) +
+  geom_line(
+    aes(colour=scenario, group = interaction(model, scenario)),
+    linewidth=1.2
+  ) +
+  geom_line(
+    data = cmip7.history %>% filter(variable=="CO2", year>=1990),
+    aes(group = interaction(scenario)),
+    linewidth=1.3,
+    colour="black"
+  ) +
+  scale_color_manual(breaks=SCENARIOS.7,values=SCENARIOS.7.COLOURS) +
+  coord_cartesian(xlim = c(2005,2035), ylim = c(15,65)) +
+  scale_x_continuous(breaks=seq(2005,2035,5)) +
+  theme_jsk() +
+  mark_history(sy = 2023) +
+  labs(y = "Gt CO2/yr",
+       title = expression(bold(Update) ~ "of scenarios")) +
+  theme(legend.title = element_blank(),
+        legend.position = "right")
+r3c3
+
+
+
+### COMBINED ----
+
+# p.quicca.harmonisation <- c1 + r1c2 + r1c3 + r2c2 + r2c3 + plot_layout(
+#   design = "ABC
+#             ADE"
+# )
+# p.quicca.harmonisation
+
+
+library(grid)
+
+arrow_plot <- ggplot() +
+  theme_void() +
+  annotation_custom(
+    grob = segmentsGrob(
+      x0 = 0.2, x1 = 0.8,
+      y0 = 0.5, y1 = 0.5,
+      arrow = arrow(length = unit(6, "pt"), type = "closed"),
+      gp = gpar(fill = "black", lwd = 1.5)
+    )
+  )
+
+p.quicca.harmonisation.v1 <- c1 + r1c2 + arrow_plot + r1c3 +
+  r2c2 + arrow_plot + r2c3 +
+  plot_layout(
+    design = "ABCD
+              AEFG",
+    widths = c(2, 1, 0.15, 1)
+  )
+p.quicca.harmonisation.v1
+
+save_ggplot(
+  p = p.quicca.harmonisation.v1,
+  f = here("figures", "quicca_updates_v1_0"),
+  h = 150, w = 280
+)
+
+p.quicca.harmonisation.v2 <- c1 +
+  r1c2 + arrow_plot + r1c3 +
+  r2c2 + arrow_plot + r2c3 +
+  r3c2 + arrow_plot + r3c3 +
+  plot_layout(
+    design = "ABCD
+              AEFG
+              AHIJ",
+    widths = c(2, 1, 0.15, 1)
+  )
+p.quicca.harmonisation.v2
+
+
+save_ggplot(
+  p = p.quicca.harmonisation.v2,
+  f = here("figures", "quicca_updates_v2_0"),
+  h = 200, w = 280
+)
+
