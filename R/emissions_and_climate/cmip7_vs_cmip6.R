@@ -121,6 +121,60 @@ cmip7.history <- read_csv(
   mutate_cond(variable=="CO2", unit="Gt CO2/yr")
 cmip7.history |> distinct(variable,unit)
 
+### china ----
+cmip7.history.chn <- vroom(
+  "C:/Users/kikstra/OneDrive - IIASA/_Other/Data/Emissions data/cmip7/country-history.csv"
+) %>% filter(region=="chn") %>%
+  iamc_wide_to_long()
+
+
+
+## cmip7: country-level (downscaled) ----
+cmip7.scenarios.china <- vroom(
+  # H
+  "C:/Users/kikstra/Downloads/downscaled-only-h_1-1-0.csv"
+) %>%
+  bind_rows(
+    # HL
+    vroom(
+      "C:/Users/kikstra/Downloads/downscaled-only-results_20260302_hl.csv"
+    )
+  ) %>%
+  bind_rows(
+    # M
+    vroom(
+      "C:/Users/kikstra/Downloads/downscaled-only-results_20260302_m.csv"
+    )
+  ) %>%
+  bind_rows(
+    # ML
+    vroom(
+      "C:/Users/kikstra/Downloads/downscaled-only-results_20260309_ml.csv"
+    )
+  ) %>%
+  bind_rows(
+    # L
+    vroom(
+      "C:/Users/kikstra/Downloads/downscaled-only-results_20260305_l.csv"
+    )
+  ) %>%
+  bind_rows(
+    # LN
+    vroom(
+      "C:/Users/kikstra/Downloads/downscaled-only-results_20260302_ln.csv"
+    )
+  ) %>%
+  bind_rows(
+    # VL
+    vroom(
+      "C:/Users/kikstra/Downloads/downscaled-only-vl_1-1-0.csv"
+    )
+  ) %>%
+  filter(country=="chn")
+# test with available data
+# cmip7.scenarios.china <- vroom(
+#   "C:/Users/kikstra/IIASA/ECE.prog - Documents/Projects/CMIP7/IAM Data Processing/Shared emission fields data/v1_1-testing-findmistakes/vl_1-1-0/downscaled-only-vl_1-1-0.csv"
+# ) %>% filter(country=="chn")
 
 
 
