@@ -894,6 +894,7 @@ scen.cmip7 <- cmip7.scenarios.global |> filter(variable=="CO2") |> add_facet_lab
 
 
 ## Plots ----
+library(geomtextpath)
 
 ### Column 1 ----
 c1 <- ggplot(
@@ -901,6 +902,16 @@ c1 <- ggplot(
   aes(x = year, y = value)
 ) +
   # facet_wrap(~facet_label, scales = "free_y", nrow = 1) +
+  annotate(
+    "text",
+    x = 2015-0.5, y = 17,
+    label = "CMIP history",
+    hjust = 1,
+    vjust = 0,
+    fontface = "bold",
+    colour = "black",
+    size = 3.5
+  ) +
   geom_line(
     data = scen.cmip6,
     aes(colour=scenario,group = interaction(model, scenario)),
@@ -912,15 +923,22 @@ c1 <- ggplot(
     linewidth=1.3,
     colour="black"
   ) +
+  geom_textvline(
+    xintercept = 2025,
+    label = "Present day",
+    linetype = "dashed",
+    colour = "grey40",
+    hjust = 0.05
+  ) +
   scale_color_manual(breaks=SCENARIOS.6,values=SCENARIOS.6.COLOURS) +
   coord_cartesian(xlim = c(2005,2035), ylim = c(15,65)) +
-  scale_x_continuous(breaks=seq(2005,2035,5)) +
+  scale_x_continuous(breaks=seq(2005,2035,5),labels=c()) +
   theme_jsk() +
   mark_history(sy = 2015) +
   labs(y = "Gt CO2/yr",
-       title = "CMIP Phase") +
+       title = "State of the Art") +
   theme(legend.title = element_blank(),
-        legend.position = "right")
+        legend.position = "none")
 c1
 
 ### Row 1 ----
@@ -936,6 +954,13 @@ r1c2 <- ggplot(
   #   aes(colour=scenario,group = interaction(model, scenario)),
   #   linewidth=1.1
   # ) +
+  geom_textvline(
+    xintercept = 2025,
+    label = "",
+    linetype = "dashed",
+    colour = "grey40",
+    hjust = 0.05
+  ) +
   geom_line(
     data = hist.cmip6,
     aes(group = interaction(scenario)),
@@ -951,13 +976,13 @@ r1c2 <- ggplot(
 
   scale_color_manual(breaks=SCENARIOS.6,values=SCENARIOS.6.COLOURS) +
   coord_cartesian(xlim = c(2005,2035), ylim = c(15,65)) +
-  scale_x_continuous(breaks=seq(2005,2035,5)) +
+  scale_x_continuous(breaks=seq(2005,2035,5),labels=c()) +
   theme_jsk() +
   mark_history(sy = 2015) +
   labs(y = "Gt CO2/yr",
        title = expression(bold(Extension) ~ "of history")) +
   theme(legend.title = element_blank(),
-        legend.position = "right")
+        legend.position = "none")
 r1c2
 
 r1c3 <- ggplot(
@@ -965,10 +990,17 @@ r1c3 <- ggplot(
   aes(x = year, y = value)
 ) +
   # facet_wrap(~facet_label, scales = "free_y", nrow = 1) +
+  geom_textvline(
+    xintercept = 2025,
+    label = "",
+    linetype = "dashed",
+    colour = "grey40",
+    hjust = 0.05
+  ) +
   geom_line(
     data = scen.cmip6,
     aes(colour=scenario,group = interaction(model, scenario)),
-    linewidth=0.9,
+    linewidth=0.5,
     # colour="grey",
     linetype="dashed"
   ) +
@@ -990,15 +1022,16 @@ r1c3 <- ggplot(
     colour="black"
   ) +
 
+
   scale_color_manual(breaks=SCENARIOS.6,values=SCENARIOS.6.COLOURS) +
   coord_cartesian(xlim = c(2005,2035), ylim = c(15,65)) +
-  scale_x_continuous(breaks=seq(2005,2035,5)) +
+  scale_x_continuous(breaks=seq(2005,2035,5),labels=c()) +
   theme_jsk() +
   mark_history(sy = 2015) +
   labs(y = "Gt CO2/yr",
        title = "Reharmonization") +
   theme(legend.title = element_blank(),
-        legend.position = "right")
+        legend.position = "none")
 
 r1c3
 
@@ -1014,10 +1047,17 @@ r2c2 <- ggplot(
   #   aes(colour=scenario,group = interaction(model, scenario)),
   #   linewidth=1.1
   # ) +
+  geom_textvline(
+    xintercept = 2025,
+    label = "",
+    linetype = "dashed",
+    colour = "grey40",
+    hjust = 0.05
+  ) +
   geom_line(
     data = hist.cmip6,
     aes(group = interaction(scenario)),
-    linewidth=0.9,
+    linewidth=0.5,
     colour="darkgrey",
     linetype="dashed"
   ) +
@@ -1030,13 +1070,13 @@ r2c2 <- ggplot(
 
   scale_color_manual(breaks=SCENARIOS.6,values=SCENARIOS.6.COLOURS) +
   coord_cartesian(xlim = c(2005,2035), ylim = c(15,65)) +
-  scale_x_continuous(breaks=seq(2005,2035,5)) +
+  scale_x_continuous(breaks=seq(2005,2035,5),labels=c()) +
   theme_jsk() +
   mark_history(sy = 2015) +
   labs(y = "Gt CO2/yr",
        title = expression(bold(Update) ~ "of history")) +
   theme(legend.title = element_blank(),
-        legend.position = "right")
+        legend.position = "none")
 r2c2
 
 r2c3 <- ggplot(
@@ -1044,10 +1084,17 @@ r2c3 <- ggplot(
   aes(x = year, y = value)
 ) +
   # facet_wrap(~facet_label, scales = "free_y", nrow = 1) +
+  geom_textvline(
+    xintercept = 2025,
+    label = "",
+    linetype = "dashed",
+    colour = "grey40",
+    hjust = 0.05
+  ) +
   geom_line(
     data = scen.cmip6,
     aes(colour=scenario,group = interaction(model, scenario)),
-    linewidth=0.9,
+    linewidth=0.5,
     # colour="grey",
     linetype="dashed"
   ) +
@@ -1059,7 +1106,7 @@ r2c3 <- ggplot(
   geom_line(
     data = hist.cmip6,
     aes(group = interaction(scenario)),
-    linewidth=0.9,
+    linewidth=0.5,
     colour="darkgrey",
     linetype="dashed"
   ) +
@@ -1072,13 +1119,13 @@ r2c3 <- ggplot(
 
   scale_color_manual(breaks=SCENARIOS.6,values=SCENARIOS.6.COLOURS) +
   coord_cartesian(xlim = c(2005,2035), ylim = c(15,65)) +
-  scale_x_continuous(breaks=seq(2005,2035,5)) +
+  scale_x_continuous(breaks=seq(2005,2035,5),labels=c()) +
   theme_jsk() +
   mark_history(sy = 2015) +
   labs(y = "Gt CO2/yr",
        title = "Reharmonization") +
   theme(legend.title = element_blank(),
-        legend.position = "right")
+        legend.position = "none")
 
 r2c3
 
@@ -1094,7 +1141,7 @@ r3c3 <- ggplot(
   geom_line(
     data = hist.cmip6,
     aes(group = interaction(scenario)),
-    linewidth=0.9,
+    linewidth=0.5,
     linetype="dashed",
     colour="darkgrey"
   ) +
@@ -1103,7 +1150,7 @@ r3c3 <- ggplot(
     aes(group = interaction(model, scenario)),
     colour="darkgrey",
     linetype="dashed",
-    linewidth=0.9
+    linewidth=0.5
   ) +
   geom_line(
     aes(colour=scenario, group = interaction(model, scenario)),
@@ -1155,14 +1202,14 @@ p.quicca.harmonisation.v1 <- c1 + r1c2 + arrow_plot + r1c3 +
   plot_layout(
     design = "ABCD
               AEFG",
-    widths = c(2, 1, 0.15, 1)
+    widths = c(1.5, 1, 0.15, 1)
   )
 p.quicca.harmonisation.v1
 
 save_ggplot(
   p = p.quicca.harmonisation.v1,
-  f = here("figures", "quicca_updates_v1_0"),
-  h = 150, w = 280
+  f = here("figures", "quicca_updates_v1_1"),
+  h = 120, w = 230
 )
 
 p.quicca.harmonisation.v2 <- c1 +
@@ -1180,7 +1227,7 @@ p.quicca.harmonisation.v2
 
 save_ggplot(
   p = p.quicca.harmonisation.v2,
-  f = here("figures", "quicca_updates_v2_0"),
+  f = here("figures", "quicca_updates_v2_x"),
   h = 200, w = 280
 )
 
