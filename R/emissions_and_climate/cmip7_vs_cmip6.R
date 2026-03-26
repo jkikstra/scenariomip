@@ -176,6 +176,50 @@ cmip7.scenarios.china <- vroom(
 #   "C:/Users/kikstra/IIASA/ECE.prog - Documents/Projects/CMIP7/IAM Data Processing/Shared emission fields data/v1_1-testing-findmistakes/vl_1-1-0/downscaled-only-vl_1-1-0.csv"
 # ) %>% filter(country=="chn")
 
+# ## cmip7: count regions per model
+# vroom(
+#   # H
+#   "C:/Users/kikstra/Downloads/downscaled-only-h_1-1-0.csv"
+# ) %>%
+#   bind_rows(
+#     # HL
+#     vroom(
+#       "C:/Users/kikstra/Downloads/downscaled-only-results_20260302_hl.csv"
+#     )
+#   ) %>%
+#   bind_rows(
+#     # M
+#     vroom(
+#       "C:/Users/kikstra/Downloads/downscaled-only-results_20260302_m.csv"
+#     )
+#   ) %>%
+#   bind_rows(
+#     # ML
+#     vroom(
+#       "C:/Users/kikstra/Downloads/downscaled-only-results_20260309_ml.csv"
+#     )
+#   ) %>%
+#   bind_rows(
+#     # L
+#     vroom(
+#       "C:/Users/kikstra/Downloads/downscaled-only-results_20260305_l.csv"
+#     )
+#   ) %>%
+#   bind_rows(
+#     # LN
+#     vroom(
+#       "C:/Users/kikstra/Downloads/downscaled-only-results_20260302_ln.csv"
+#     )
+#   ) %>%
+#   bind_rows(
+#     # VL
+#     vroom(
+#       "C:/Users/kikstra/Downloads/downscaled-only-vl_1-1-0.csv"
+#     )
+#   ) %>%
+#   distinct(model,region) %>% filter(region!="World") %>%
+#   group_by(model) %>%
+#   count()
 
 
 # |||| ----
@@ -831,6 +875,8 @@ save_ggplot(
 ## Data ----
 
 ### History ----
+
+#### CMIP6 ----
 hist.cmip6 <- read_csv(
   "C:/Users/kikstra/Downloads/history_ar6.csv"
 ) %>%
@@ -839,29 +885,34 @@ hist.cmip6 <- read_csv(
          variable=="AR6 climate diagnostics|Emissions|CO2|Unharmonized") %>%
   mutate(variable="CO2",unit="Gt CO2/yr",value=value/1e3)
 
-hist.cmip6.extension <- hist.cmip6 %>% bind_rows(
-  hist.cmip6 %>% filter(year==2015) %>% mutate(year=2016,value=value*extension.adjustment.factor)
-) %>% distinct()
 
-hist.cmip7 <- cmip7.history %>% filter(variable=="CO2", year>=1990)
-
-
-### Scenarios ----
+#### Extension ----
 extension.new.year <- 2016
 extension.adjustment.factor <- 1.10
 harmonization.final.convergence.year <- 2040
 
+#### Update ----
+hist.cmip7 <- cmip7.history %>% filter(variable=="CO2", year>=1990)
+
+
+
+### Scenarios ----
+
+#### CMIP6 ----
+hist.cmip6.extension <- hist.cmip6 %>% bind_rows(
+  hist.cmip6 %>% filter(year==2015) %>% mutate(year=2016,value=value*extension.adjustment.factor)
+) %>% distinct()
+
+
 update.new.year <- 2023
-update.adjustment.factor <- (
-  hist.cmip7 %>% filter(year==2023) %>% pull(value)
-) / (
-  hist.cmip6 %>% filter(year==2015) %>% pull(value)
-)
 # harmonization.final.convergence.year <- 2040
 
 scen.cmip6 <- cmip6.scenarios.global |> filter(variable=="CO2") %>% add_facet_label() %>%
   filter(scenario %in% c("SSP1-19", "SSP2-45", "SSP5-85"))
 
+#### Harmonization ----
+
+##### Extension ----
 scen.cmip6.extension <- scen.cmip6 %>%
   bind_rows(
     # add a 2016 timepoint
@@ -875,20 +926,43 @@ scen.cmip6.extension <- scen.cmip6 %>%
   mutate_cond(year>=harmonization.final.convergence.year, value=value) %>%
   filter(year>=extension.new.year)
 
-scen.cmip6.updated <- scen.cmip6 %>%
+##### Update ----
+# Linear interpolation to add 2023 between 2020 and 2030
+scen.cmip6.w2023 <- scen.cmip6 %>%
   bind_rows(
-    # add a 2016 timepoint
-    scen.cmip6 %>% filter(year==2015) %>% mutate(year=2023,value=value*update.adjustment.factor)
+    scen.cmip6 %>%
+      filter(year %in% c(2020, 2030)) %>%
+      pivot_wider(names_from = year, values_from = value) %>%
+      mutate(
+        year  = 2023,
+        value = `2020` + (`2030` - `2020`) * (2023 - 2020) / (2030 - 2020)
+      ) %>%
+      select(-`2020`, -`2030`)
   ) %>%
-  filter(year>=2023) %>%
-  distinct() %>% arrange(model,scenario,region,variable,unit,year) %>%
-  mutate_cond(year>update.new.year & year<harmonization.final.convergence.year,
-              value=value*(1 + (update.adjustment.factor - 1) *
-                             (harmonization.final.convergence.year - year) /
-                             (harmonization.final.convergence.year - update.new.year))) %>%
-  mutate_cond(year>=harmonization.final.convergence.year, value=value) %>%
-  filter(year>=update.new.year)
+  arrange(model, scenario, region, variable, unit, year)
 
+update.adjustment.factor.per_scen <- scen.cmip6.w2023 %>%
+  filter(year == 2023) %>%
+  mutate(hist = (hist.cmip7 %>% filter(year == 2023) %>% pull(value))) %>%
+  mutate(update.adjustment.diff = value - hist) %>%
+  select(model, scenario, update.adjustment.diff)
+
+scen.cmip6.updated <- scen.cmip6.w2023 %>%
+  filter(year >= update.new.year) %>%
+  distinct() %>%
+  arrange(model, scenario, region, variable, unit, year) %>%
+  left_join(update.adjustment.factor.per_scen, by = c("model", "scenario")) %>%
+  mutate(value = case_when(
+    year == update.new.year ~
+      value - update.adjustment.diff,
+    year > update.new.year & year < harmonization.final.convergence.year ~
+      value - update.adjustment.diff * (harmonization.final.convergence.year - year) /
+      (harmonization.final.convergence.year - update.new.year),
+    year >= harmonization.final.convergence.year ~
+      value
+  ))
+
+#### CMIP7 ----
 scen.cmip7 <- cmip7.scenarios.global |> filter(variable=="CO2") |> add_facet_label() %>%
   filter(scenario %in% c("VL", "ML", "H"))
 
@@ -901,7 +975,6 @@ c1 <- ggplot(
   scen.cmip7,
   aes(x = year, y = value)
 ) +
-  # facet_wrap(~facet_label, scales = "free_y", nrow = 1) +
   annotate(
     "text",
     x = 2015-0.5, y = 17,
@@ -914,14 +987,27 @@ c1 <- ggplot(
   ) +
   geom_line(
     data = scen.cmip6,
-    aes(colour=scenario,group = interaction(model, scenario)),
-    linewidth=1.1
+    aes(colour = scenario, group = interaction(model, scenario)),
+    linewidth = 1.1
+  ) +
+  geom_labelline(
+    data = scen.cmip6 %>% filter(scenario == "SSP2-45"),
+    aes(group = interaction(model, scenario),
+        colour = scenario,
+        label = "SSP2-4.5"),          # hardcoded string, not aes mapping
+    linewidth = 1.5,
+    fontface = "bold",
+    hjust = 0.16,
+    size = 3,
+    fill = "white",                  # box background
+    boxcolour = NA,                  # box border (NA = no border, or set to match line colour)
+    label.padding = unit(0.15, "lines")
   ) +
   geom_line(
     data = hist.cmip6,
     aes(group = interaction(scenario)),
-    linewidth=1.3,
-    colour="black"
+    linewidth = 1.3,
+    colour = "black"
   ) +
   geom_textvline(
     xintercept = 2025,
@@ -930,9 +1016,9 @@ c1 <- ggplot(
     colour = "grey40",
     hjust = 0.05
   ) +
-  scale_color_manual(breaks=SCENARIOS.6,values=SCENARIOS.6.COLOURS) +
-  coord_cartesian(xlim = c(2005,2035), ylim = c(15,65)) +
-  scale_x_continuous(breaks=seq(2005,2035,5),labels=c()) +
+  scale_color_manual(breaks = SCENARIOS.6, values = SCENARIOS.6.COLOURS) +
+  coord_cartesian(xlim = c(2005, 2035), ylim = c(15, 65)) +
+  scale_x_continuous(breaks = seq(2005, 2035, 5), labels = c()) +
   theme_jsk() +
   mark_history(sy = 2015) +
   labs(y = "Gt CO2/yr",
@@ -1171,7 +1257,7 @@ r3c3 <- ggplot(
        title = expression(bold(Update) ~ "of scenarios")) +
   theme(legend.title = element_blank(),
         legend.position = "right")
-r3c3
+# r3c3
 
 
 
@@ -1208,7 +1294,7 @@ p.quicca.harmonisation.v1
 
 save_ggplot(
   p = p.quicca.harmonisation.v1,
-  f = here("figures", "quicca_updates_v1_1"),
+  f = here("figures", "quicca_updates_v1_2"),
   h = 120, w = 230
 )
 
