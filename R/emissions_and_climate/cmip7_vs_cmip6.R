@@ -1317,3 +1317,131 @@ save_ggplot(
   h = 200, w = 280
 )
 
+
+# ECMWF report March 2026 ----
+
+## Figure 1 ----
+# --> see `C:/Users/kikstra/Documents/GitHub/scenariomip/R/emissions_and_climate/srcities_scenariomip_ar6like.R`
+
+
+
+## Figure 2 ----
+ar6.history <- read_csv(
+  "C:/Users/kikstra/Downloads/history_ar6.csv"
+) %>%
+  iamc_wide_to_long(upper.to.lower = T) %>%
+  iamc_variable_keep_two_levels(levels = c(3,4)) %>%
+  filter(variable%nin%c("CO2|Energy and Industrial Processes","CO2|AFOLU")) %>%
+  iamc_variable_keep_one_level(level=1) %>%
+  filter(variable%in%the.ten) %>%
+  mutate_cond(variable=="VOC", variable="NMVOC") %>%
+  mutate_cond(variable=="Sulfur", variable="SO2") %>%
+  mutate_cond(variable=="CO2", value=value/1e3) %>%
+  mutate_cond(variable=="CO2", unit="Gt CO2/yr")
+
+f2_ecmwf_plot <- function(species, nrow=1){
+  ggplot(
+    cmip6.scenarios.global |> filter(variable%in%species) |>
+      add_facet_label(),
+    aes(x = year, y = value)
+  ) +
+    facet_wrap(~facet_label, scales = "free_y", nrow = nrow) +
+
+    # cmip6 background
+    geom_line(
+      aes(colour=scenario, group = interaction(model, scenario)),
+      colour="darkgrey",
+      linewidth=0.7
+    ) +
+    geom_line(
+      data = ar6.history %>% filter(variable%in%species, year>=1990) |>
+        add_facet_label(),
+      aes(group = interaction(scenario)),
+      colour="darkgrey",
+      linewidth=0.7
+    ) +
+
+    # cmip7 scenarios
+    geom_line(
+      data=cmip7.scenarios.global|> filter(variable%in%species) |>
+        add_facet_label(),
+      aes(colour=scenario, group = interaction(model, scenario)),
+      linewidth = 0.3,
+      linetype = "dashed",
+      alpha = 0.5
+    ) +
+    # highlight L
+    geom_line(
+      data=cmip7.scenarios.global|> filter(variable%in%species,scenario=="L") |>
+        add_facet_label(),
+      aes(colour=scenario, group = interaction(model, scenario)),
+      linewidth = 1.3
+    ) +
+    # cmip7 history
+    geom_line(
+      data = cmip7.history %>% filter(variable%in%species, year>=1990) |>
+        add_facet_label(),
+      aes(group = interaction(scenario)),
+      linewidth=1.3,
+      colour="black"
+    ) +
+
+
+    scale_color_manual(breaks=SCENARIOS.7,values=SCENARIOS.7.COLOURS) +
+    scale_x_continuous(limits = c(2010,2100),expand = c(0,0)) +
+    theme_jsk() +
+    mark_history(sy = 2025) +
+    labs(y = NULL) +
+    theme(legend.title = element_blank(),
+          legend.position = "none")
+}
+
+
+f2.co2 <- f2_ecmwf_plot(c("CO2")) +
+  scale_linetype_manual(
+    breaks = SCENARIOS.7,
+    values = setNames(
+      ifelse(SCENARIOS.7 == "L", "solid", "dashed"),
+      SCENARIOS.7
+    )
+  ) +
+  guides(
+    colour = guide_legend(override.aes = list(linewidth = 1)),
+    linetype = guide_legend(override.aes = list(linewidth = 1))
+  ) +
+  theme(
+    legend.position = c(0.02, 0.98),
+    legend.justification = c(0, 1),
+    legend.background = element_rect(fill = alpha("white", 0.7)),
+    legend.box.background = element_rect(colour = "black", linewidth = 0.5),
+    legend.key.width = unit(1.5, "cm"),
+    legend.title = element_blank(),
+    legend.text = element_text(size = 8)
+  )
+# f2.co2
+
+f2.nonco2ghg <- f2_ecmwf_plot(c("CH4", "N2O"))
+# f2.nonco2ghg
+
+slcf_list <- c("BC", "CO", "NH3", "NMVOC", "NOx", "OC", "SO2")
+
+f2.slcf <- f2_ecmwf_plot(slcf_list, nrow=length(slcf_list))
+# f2.slcf
+
+
+f2 <- (f2.co2 + f2.nonco2ghg + f2.slcf) +
+  labs(caption = "Grey background: CMIP6 scenarios.") +
+  plot_layout(
+    design = "
+    AAC
+    AAC
+    BBC
+    "
+  )
+
+f2
+save_ggplot(
+  p = f2,
+  f = here("figures", "ecmwf_march2026_f2_v1_1"),
+  h = 250, w = 250
+)

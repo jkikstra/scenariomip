@@ -174,6 +174,174 @@ ar6.history <- read_csv(
 
 
 
+# ECMWF report March 2026 ----
+
+## Figure 1 ----
+f1a <- ggplot(mapping=aes(x=year)) +
+  facet_grid(interaction(variable)~scenario, scales="free_y") +
+
+  geom_line(
+    data = cmip7.history %>% mutate(
+      `Assessment workflow` = "CMIP7"
+    ) %>%
+      filter(variable%in%paste0("Emissions|",
+                                c("CO2|AFOLU", "CO2|Energy and Industrial Processes"))) %>%
+      iamc_variable_keep_one_level(-1) %>%
+      select(-scenario) %>%
+      filter(
+        year>=2010
+      ),
+    aes(y=value/1e3, linetype = `Assessment workflow`),
+    colour="black"
+  ) +
+
+  geom_line(
+    data = scenariomip.like7 %>% mutate(
+      `Assessment workflow` = "CMIP7"
+    ) %>%
+      filter(variable%in%c(paste0("Climate Assessment|Harmonized and Infilled|Emissions|",
+                                  c("CO2|AFOLU", "CO2|Energy and Industrial Processes")),
+                           paste0("Infilled|Emissions|",
+                                  c("CO2|AFOLU", "CO2|Energy and Industrial Processes")))) %>%
+      iamc_variable_keep_one_level(-1) %>%
+      rename_cmip7_scenarios() %>%
+      mutate(scenario = factor(scenario, levels = scenario_order)),
+    aes(y=value/1e3, colour=scenario, linetype=`Assessment workflow`)
+  ) +
+
+  # geom_line(
+  #   data = scenariomip.like7 %>% mutate(
+  #     `Assessment workflow` = "CMIP7"
+  #   ) %>%
+  #     filter(variable%in%c(paste0("Climate Assessment|Harmonized and Infilled|Emissions|",
+  #                                 c("CO2|AFOLU", "CO2|Energy and Industrial Processes")),
+  #                          paste0("Infilled|Emissions|",
+  #                                 c("CO2|AFOLU", "CO2|Energy and Industrial Processes")))) %>%
+  #     iamc_variable_keep_one_level(-1) %>%
+  #     rename_cmip7_scenarios() %>%
+  #     filter(scenario=="L") %>%
+  #     mutate(scenario = factor(scenario, levels = scenario_order)),
+  #   aes(y=value/1e3, colour=scenario, linetype=`Assessment workflow`),
+  #   linewidth=1.2
+  # ) +
+
+
+  theme_jsk() +
+  mark_history(sy=2025) +
+  theme(
+    strip.text.y = element_text(angle = 0,hjust = 0)
+  ) +
+  guides(
+    color="none",
+    linetype="none"
+  ) +
+  labs(y="GtCO2 / year",
+       title = "ScenarioMIP-CMIP7 emissions and climate",
+       subtitle = "CO2 emissions trajectories") +
+  scale_color_manual(breaks=SCENARIOS.7,values=SCENARIOS.7.COLOURS) +
+  scale_fill_manual(breaks=SCENARIOS.7,values=SCENARIOS.7.COLOURS) +
+  scale_x_continuous(expand = c(0,0))
+f1a
+
+f1b <- ggplot(mapping=aes(x=year)) +
+  # facet_grid(variable~scenario, scales="free_y") +
+  geom_line(
+    data = scenariomip.like7 %>% mutate(
+      `Assessment workflow` = "CMIP7"
+    ) %>%
+      filter(variable%in%c(
+        "Climate Assessment|Surface Temperature (GSAT)|Median [MAGICCv7.6.0a3]",
+        "Surface Temperature (GSAT) - 0.5 - MAGICCv7.6.0a3"
+
+      )) %>%
+      mutate(variable="GSAT") %>%
+      rename_cmip7_scenarios() %>%
+      mutate(scenario = factor(scenario, levels = scenario_order)),
+    aes(y=value, colour=scenario, linetype=`Assessment workflow`)
+  ) +
+
+  # range L
+  geom_ribbon(
+    data = scenariomip.like7 %>%
+      filter(variable%in%c(
+        "Climate Assessment|Surface Temperature (GSAT)|67th Percentile [MAGICCv7.6.0a3]",
+        "Surface Temperature (GSAT) - 0.67 - MAGICCv7.6.0a3"
+      )) %>%
+      mutate(variable = "p67") %>%
+      bind_rows(
+        scenariomip.like7 %>%
+        filter(variable%in%c(
+          "Climate Assessment|Surface Temperature (GSAT)|33rd Percentile [MAGICCv7.6.0a3]",
+          "Surface Temperature (GSAT) - 0.33 - MAGICCv7.6.0a3"
+        )) %>%
+          mutate(variable = "p33")
+      ) %>%
+      rename_cmip7_scenarios() %>%
+      filter(scenario=="L") %>%
+      pivot_wider(names_from = variable, values_from = value),
+    aes(ymin=`p33`,
+        ymax=`p67`,
+        fill=scenario),
+    alpha=0.3
+  ) +
+
+  # highlight L
+  geom_line(
+    data = scenariomip.like7 %>% mutate(
+      `Assessment workflow` = "CMIP7"
+    ) %>%
+      filter(variable%in%c(
+        "Climate Assessment|Surface Temperature (GSAT)|Median [MAGICCv7.6.0a3]",
+        "Surface Temperature (GSAT) - 0.5 - MAGICCv7.6.0a3"
+      )) %>%
+      mutate(variable="GSAT") %>%
+      rename_cmip7_scenarios() %>%
+      filter(scenario=="L") %>%
+      mutate(scenario = factor(scenario, levels = scenario_order)),
+    aes(y=value, colour=scenario),
+    linewidth=1.2
+  ) +
+
+
+  mark_history(sy = 2025) +
+  theme_jsk() +
+  guides(
+    color="none",
+    linetype="none",
+    fill="none"
+  ) +
+  theme(
+    strip.text.y = element_text(angle = 0,hjust = 0)
+  ) +
+  labs(subtitle="Emulated GSAT outcomes",caption="33-67th percentile range visualised for the L scenario") +
+  ylab("Temperature above\n1850-1900 mean [\u00B0C]") +
+  scale_color_manual(breaks=SCENARIOS.7,values=SCENARIOS.7.COLOURS) +
+  scale_fill_manual(breaks=SCENARIOS.7,values=SCENARIOS.7.COLOURS) +
+  scale_x_continuous(expand = c(0,0))
+
+f1b
+
+f1 <- f1a + f1b +
+  plot_layout(
+    design =
+    "A
+    B",
+    heights = c(1,2)
+  )
+f1
+
+save_ggplot(
+  p = f1,
+  f = here("figures", "ecmwf_march2026_f1_v1_0"),
+  h = 250, w = 250
+)
+
+
+
+## Figure 2 ----
+# --> see `cmip7_vs_cmip6`
+
+
 # Plot the ten core emissions (tbd) ----
 em10 <- ggplot(mapping=aes(x=year)) +
   facet_grid(interaction(variable,unit)~scenario, scales="free_y") +
@@ -332,7 +500,7 @@ temp.p50.srcities.plot
 
 save_ggplot(
   p = temp.p50.srcities.plot,
-  f = here("figures", "scenariomip_forSRCITIES_TEMPS_ar6like"),
+  f = here("figures", "scenariomip_forSRCITIES_TEMPS_ar6like_v2"),
   h = 200, w = 200
 )
 
@@ -466,3 +634,5 @@ write_delim(x = scenariomip.like6.temperature,
             file = "C:/Users/kikstra/OneDrive - IIASA/_Other/ClimateAssessmentRun2026 - SRCITIES_ScenarioMIP/temperature_from_scm/temperature_magicc_v2.csv",
             delim = ","
 )
+
+
