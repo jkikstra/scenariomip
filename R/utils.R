@@ -1,6 +1,24 @@
 #' Useful functions for the `decent` software package
 
+# Install and load required packages -------------------------------------------
+required_packages <- c(
+  "here", "tidyverse", "vroom", "readxl", "writexl", "openxlsx",
+  "rlang", "fs", "glue", "ggthemes", "zoo", "styler", "testthat"
+)
+missing_packages <- setdiff(required_packages, rownames(installed.packages()))
+if (length(missing_packages) > 0) {
+  install.packages(missing_packages)
+}
 
+library(here)
+library(tidyverse)   # includes dplyr, tidyr, readr, ggplot2, stringr, purrr, etc.
+library(vroom)
+library(readxl)
+library(rlang)
+library(fs)
+library(glue)
+library(ggthemes)    # for theme_hc() used in theme_jsk()
+library(zoo)         # for na.approx() used in interpolate_NA_annual()
 
 # IAM utils --------------------------------------------------------------------
 
@@ -1212,8 +1230,6 @@ flatten_multiindex_csv_new <- function(file_path,
   return(data_long)
 }
 
-library("fs") # for using Unix-style globs in dir_ls() like `"*.csv"`
-library("glue") # for pasting like `glue("Loaded {length(all_files)} files.")`
 load_multiple_files <- function(folder.path,
                                 iamc=TRUE,
                                 pattern=NULL,
@@ -1589,10 +1605,6 @@ iamc_variable_keep_two_levels <- function(df, levels){
 }
 
 
-
-# Load necessary libraries
-library(dplyr)
-library(stringr)
 
 # Function: Remove a specific first-level match from the variable column
 # @param df A data frame containing a column named `variable`.

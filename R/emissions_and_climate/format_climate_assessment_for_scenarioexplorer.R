@@ -3,6 +3,12 @@
 
 
 # Load packages ----
+required_packages <- c("here", "tidyverse", "vroom", "readxl", "writexl", "openxlsx", "testthat")
+missing_packages <- setdiff(required_packages, rownames(installed.packages()))
+if (length(missing_packages) > 0) {
+  install.packages(missing_packages)
+}
+
 library("here")
 library("tidyverse")
 library("vroom")
@@ -25,18 +31,31 @@ CLIMATE_VARIABLE_PREFIX <- paste0(GENERAL_VARIABLE_PREFIX)
 # MAGICC_VERSION <- 
 
 ## Climate Assessment Data ----
-MAIN_DATE <- "20260205" # date of climate assessment run
+MAIN_DATE <- "20260205" # date of climate assessment run (v0.1)
 VERSION_RELEASE_SCENARIOMIP <- "v0.1" # version of the data release for ScenarioMIP
-MAIN_DATA_FOLDER_CLIMATE_ASSESSMENT <- here("data", "ca", paste0(MAIN_DATE, " (release v0.1)")) # prep for first pre-release (only infilled emissions and climate outcomes)
+
+MAIN_DATE <- "20260325" # date of climate assessment run (v0.2)
+VERSION_RELEASE_SCENARIOMIP <- "v0.2" # version of the data release for ScenarioMIP
+VERSION_RELEASE_SCENARIOMIP_PREVIOUS <- "v0.1"
+
+MAIN_DATA_FOLDER_NAME <- paste0(MAIN_DATE, " (release ", VERSION_RELEASE_SCENARIOMIP, ")")
+MAIN_DATA_FOLDER_CLIMATE_ASSESSMENT <- here("data", "ca", MAIN_DATA_FOLDER_NAME) # prep for first pre-release (only infilled emissions and climate outcomes)
 DATA.EHH.FOLDERS <- c(
   MAIN_DATA_FOLDER_CLIMATE_ASSESSMENT
 )
 PATH.CLIMATE.DATA <- file.path(DATA.EHH.FOLDERS, "climate-assessment")
-PATH.CLIMATE.DATA.EXCEEDANCE <- file.path(DATA.EHH.FOLDERS, "exceedance_probabilities")
+if (VERSION_RELEASE_SCENARIOMIP == "v0.1") {
+  PATH.CLIMATE.DATA.EXCEEDANCE <- file.path(DATA.EHH.FOLDERS, "exceedance_probabilities")
+} else if (VERSION_RELEASE_SCENARIOMIP == "v0.2") {
+  PATH.CLIMATE.DATA.EXCEEDANCE <- file.path(DATA.EHH.FOLDERS, "exceedance-probabilities")
+} else {
+  message("Unknown version, skipping exceedance probabilities.")
+  next
+}
 
 ## Output ----
 PUBLICATION_FOLDER <- file.path(MAIN_DATA_FOLDER_CLIMATE_ASSESSMENT, "for publication")
-FINAL_DATA_FILE <- file.path(PUBLICATION_FOLDER, "climate_assessment.xlsx")
+FINAL_DATA_FILE <- file.path(PUBLICATION_FOLDER, paste0("climate_assessment " , MAIN_DATA_FOLDER_NAME,".xlsx"))
 
 ## README sheet ----
 # README_FILE_PATH <- file.path(MAIN_DATA_FOLDER_CLIMATE_ASSESSMENT, "climate_assessment_with_manual_readme_example.xlsx")
@@ -226,7 +245,9 @@ for (p in PATH.CLIMATE.DATA){
 metadata.exceedance <- NULL
 for (p in PATH.CLIMATE.DATA.EXCEEDANCE){
 
-  metadata.exceedance <- metadata.exceedance %>% bind_rows(
+  if (VERSION_RELEASE_SCENARIOMIP == "v0.1") {
+    message("Loading exceedance probabilities from v0.1 path: ", p)
+    metadata.exceedance <- metadata.exceedance %>% bind_rows(
       load_multiple_files(folder.path = p,
                         iamc = F,
                         pattern = "exceedance_probabilities",
@@ -235,6 +256,18 @@ for (p in PATH.CLIMATE.DATA.EXCEEDANCE){
       add_scenariomip_info_columns() |> 
       mutate(ca.version = get_date_string_path_climate_data(p))
   )
+  } else {
+    message("Loading exceedance probabilities from v0.2 path: ", p)
+    metadata.exceedance <- metadata.exceedance %>% bind_rows(
+      load_multiple_files(folder.path = p,
+                        iamc = F,
+                        pattern = "exceedance_probabilities",
+                        iamc.wide.to.long = F) |> 
+      # rename(value=`0`) |> 
+      add_scenariomip_info_columns() |> 
+      mutate(ca.version = get_date_string_path_climate_data(p))
+  )
+  }
 
 }
 
@@ -376,12 +409,19 @@ metadata.combined.formatted <- metadata.warming.formatted |>
 
 ##  Rename scenarios and select scenarios ----
 ### Data ----
-combined.formatted.filtered <- combined.formatted |> 
-  fix_scenario_names() |> 
-  filter(!is.na(new_scenario_name)) |> 
-  filter(
-    new_scenario_name != "Medium-to-Low - SSP2 (Marker)"
-  )
+if (VERSION_RELEASE_SCENARIOMIP == "v0.1") {
+  combined.formatted.filtered <- combined.formatted |> 
+    fix_scenario_names() |> 
+    filter(!is.na(new_scenario_name)) |> 
+    filter(
+      new_scenario_name != "Medium-to-Low - SSP2 (Marker)"
+    )
+} else {
+  combined.formatted.filtered <- combined.formatted |> 
+    fix_scenario_names() |> 
+    filter(!is.na(new_scenario_name))
+}
+
 
 combined.formatted.filtered |> 
   distinct(model,scenario,new_scenario_name)
@@ -389,10 +429,11 @@ combined.formatted.filtered |>
 ### Metadata ----
 metadata.combined.formatted.filtered <- metadata.combined.formatted |> 
   fix_scenario_names() |> 
-  filter(!is.na(new_scenario_name)) |> 
-  filter(
-    new_scenario_name != "Medium-to-Low - SSP2 (Marker)"
-  )
+  filter(!is.na(new_scenario_name)) # |> 
+  # only for v0.1 ML was not ready yet.
+  # filter(
+  #   new_scenario_name != "Medium-to-Low - SSP2 (Marker)" # not included in v0.1
+  # )
 
 metadata.combined.formatted.filtered |> 
   distinct(model,scenario,new_scenario_name)
@@ -523,3 +564,175 @@ testthat::test_that(
 }
 )
 
+
+
+# Compare to previously published version (manual) ----
+# v0.1
+v_previous <- read_excel(here("data", "ca", 
+            paste0("ScenarioMIP_emissions_marker_scenarios_", VERSION_RELEASE_SCENARIOMIP_PREVIOUS,".xlsx")), 
+            sheet = "data") |> 
+  iamc_wide_to_long() |> rename(value_old = value)
+v_previous
+
+# # v0.2
+# v02 <- read_excel(here("data", "ca", 
+#             "ScenarioMIP_emissions_marker_scenarios_v0.2.xlsx"), 
+#             sheet = "data") |> 
+#   iamc_wide_to_long()
+# v02
+
+
+new <- combined.formatted.filtered.iamc
+
+## All ---- 
+comparison <- new |> iamc_wide_to_long() |> rename(value_new = value) |> 
+  left_join(v_previous, by = c("model", "scenario", "region", "variable", "unit", "year")) |> 
+  mutate(difference = value_new - value_old) |> 
+  mutate(facet_label = paste0(variable, "\n(", unit, ")"))
+comparison
+
+p.diff.all <- ggplot(comparison, aes(x=year)) +
+  facet_grid(facet_label~scenario, scales="free_y") +
+  
+  geom_line(aes(y=value_new, linetype=VERSION_RELEASE_SCENARIOMIP, linewidth=VERSION_RELEASE_SCENARIOMIP, color=VERSION_RELEASE_SCENARIOMIP)) +
+  geom_line(aes(y=value_old, linetype=VERSION_RELEASE_SCENARIOMIP_PREVIOUS, linewidth=VERSION_RELEASE_SCENARIOMIP_PREVIOUS, color=VERSION_RELEASE_SCENARIOMIP_PREVIOUS)) +
+  
+  scale_linetype_manual(breaks=c(VERSION_RELEASE_SCENARIOMIP_PREVIOUS,VERSION_RELEASE_SCENARIOMIP), values=c("dashed", "solid")) + 
+  scale_linewidth_manual(breaks=c(VERSION_RELEASE_SCENARIOMIP_PREVIOUS,VERSION_RELEASE_SCENARIOMIP), values=c(1.1, 0.8)) +
+  scale_color_manual(breaks=c(VERSION_RELEASE_SCENARIOMIP_PREVIOUS,VERSION_RELEASE_SCENARIOMIP), values=c("grey", "dodgerblue")) +
+  labs(title=paste0("Comparison of ", VERSION_RELEASE_SCENARIOMIP, " vs ", VERSION_RELEASE_SCENARIOMIP_PREVIOUS, " values", x=NULL)) +
+  # theme_jsk() + mark_history(sy=2025) + 
+  theme(strip.text.y = element_text(angle = 0))
+# p.diff.all
+
+save_ggplot(
+  p = p.diff.all,
+  f = file.path(PUBLICATION_FOLDER, "fig_compared_to_previous"),
+  h = 2000,
+  w = 600,
+  format = "png",
+  limitsize= FALSE
+)
+
+# add diff
+p.diff.all.diff <- ggplot(comparison, aes(x = year)) +
+  facet_grid(facet_label ~ scenario, scales = "free_y") +
+  geom_rect(
+    data = data.frame(xmin = -Inf, xmax = Inf, ymin = 0, ymax = Inf),
+    aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
+    fill = "green",
+    alpha = 0.3,
+    inherit.aes = FALSE
+  ) +
+  geom_rect(
+    data = data.frame(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = 0),
+    aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
+    fill = "red",
+    alpha = 0.3,
+    inherit.aes = FALSE
+  ) +
+  geom_line(aes(y = difference)) +
+  labs(
+    title = paste0("Comparison of ", VERSION_RELEASE_SCENARIOMIP, " vs ", VERSION_RELEASE_SCENARIOMIP_PREVIOUS, " values"),
+    x = NULL,
+    y = "New - old"
+  ) +
+  theme(strip.text.y = element_text(angle = 0))
+# p.diff.all.diff
+
+save_ggplot(
+  p = p.diff.all.diff,
+  f = file.path(PUBLICATION_FOLDER, "fig_compared_to_previous_diff"),
+  h = 2000,
+  w = 600,
+  format = "png",
+  limitsize= FALSE
+)
+
+## Key variables ---- 
+comparison.key <- comparison |> filter(
+  variable %in% c(
+    "Climate Assessment|Surface Temperature (GSAT)|Median [MAGICCv7.6.0a3]",
+    "Climate Assessment|Harmonized and Infilled|Emissions|VOC",
+    "Climate Assessment|Harmonized and Infilled|Emissions|Sulfur",
+    "Climate Assessment|Harmonized and Infilled|Emissions|OC",
+    "Climate Assessment|Harmonized and Infilled|Emissions|NOx",
+    "Climate Assessment|Harmonized and Infilled|Emissions|NH3",
+    "Climate Assessment|Harmonized and Infilled|Emissions|N2O",
+    "Climate Assessment|Harmonized and Infilled|Emissions|Kyoto GHG AR6GWP100",
+    "Climate Assessment|Harmonized and Infilled|Emissions|GHG AR6GWP100",
+    "Climate Assessment|Harmonized and Infilled|Emissions|CO2|Energy and Industrial Processes",
+    "Climate Assessment|Harmonized and Infilled|Emissions|CO2|AFOLU",
+    "Climate Assessment|Harmonized and Infilled|Emissions|CO2",
+    "Climate Assessment|Harmonized and Infilled|Emissions|CO",
+    "Climate Assessment|Harmonized and Infilled|Emissions|CH4",
+    "Climate Assessment|Harmonized and Infilled|Emissions|BC",
+    "Climate Assessment|Harmonized and Infilled|Cumulative Emissions|CO2",
+    "Climate Assessment|Effective Radiative Forcing|Ozone|Median [MAGICCv7.6.0a3]",
+    "Climate Assessment|Effective Radiative Forcing|N2O|Median [MAGICCv7.6.0a3]",
+    "Climate Assessment|Effective Radiative Forcing|Median [MAGICCv7.6.0a3]",
+    "Climate Assessment|Effective Radiative Forcing|Greenhouse Gases|Median [MAGICCv7.6.0a3]",
+    "Climate Assessment|Effective Radiative Forcing|F-Gases|Median [MAGICCv7.6.0a3]",
+    "Climate Assessment|Effective Radiative Forcing|CO2|Median [MAGICCv7.6.0a3]",
+    "Climate Assessment|Effective Radiative Forcing|CH4|Median [MAGICCv7.6.0a3]",
+    "Climate Assessment|Effective Radiative Forcing|Aerosols|Median [MAGICCv7.6.0a3]"
+  )
+)
+
+p.diff.key <- ggplot(comparison.key, aes(x=year)) +
+  facet_grid(facet_label~scenario, scales="free_y") +
+  
+  geom_line(aes(y=value_new, linetype=VERSION_RELEASE_SCENARIOMIP, linewidth=VERSION_RELEASE_SCENARIOMIP, color=VERSION_RELEASE_SCENARIOMIP)) +
+  geom_line(aes(y=value_old, linetype=VERSION_RELEASE_SCENARIOMIP_PREVIOUS, linewidth=VERSION_RELEASE_SCENARIOMIP_PREVIOUS, color=VERSION_RELEASE_SCENARIOMIP_PREVIOUS)) +
+  
+  scale_linetype_manual(breaks=c(VERSION_RELEASE_SCENARIOMIP_PREVIOUS,VERSION_RELEASE_SCENARIOMIP), values=c("dashed", "solid")) + 
+  scale_linewidth_manual(breaks=c(VERSION_RELEASE_SCENARIOMIP_PREVIOUS,VERSION_RELEASE_SCENARIOMIP), values=c(1.1, 0.8)) +
+  scale_color_manual(breaks=c(VERSION_RELEASE_SCENARIOMIP_PREVIOUS,VERSION_RELEASE_SCENARIOMIP), values=c("grey", "dodgerblue")) +
+  labs(title=paste0("Comparison of ", VERSION_RELEASE_SCENARIOMIP, " vs ", VERSION_RELEASE_SCENARIOMIP_PREVIOUS, " values", x=NULL)) +
+  # theme_jsk() + mark_history(sy=2025) + 
+  theme(strip.text.y = element_text(angle = 0))
+
+
+save_ggplot(
+  p = p.diff.key,
+  f = file.path(PUBLICATION_FOLDER, "fig_compared_to_previous_keyvars"),
+  h = 1100,
+  w = 600,
+  format = "png",
+  limitsize= FALSE
+)
+
+# add diff
+p.diff.key.diff <- ggplot(comparison.key, aes(x = year)) +
+  facet_grid(facet_label ~ scenario, scales = "free_y") +
+  geom_rect(
+    data = data.frame(xmin = -Inf, xmax = Inf, ymin = 0, ymax = Inf),
+    aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
+    fill = "green",
+    alpha = 0.3,
+    inherit.aes = FALSE
+  ) +
+  geom_rect(
+    data = data.frame(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = 0),
+    aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
+    fill = "red",
+    alpha = 0.3,
+    inherit.aes = FALSE
+  ) +
+  geom_line(aes(y = difference)) +
+  labs(
+    title = paste0("Comparison of ", VERSION_RELEASE_SCENARIOMIP, " vs ", VERSION_RELEASE_SCENARIOMIP_PREVIOUS, " values"),
+    x = NULL,
+    y = "New - old"
+  ) +
+  theme(strip.text.y = element_text(angle = 0))
+
+
+save_ggplot(
+  p = p.diff.key.diff,
+  f = file.path(PUBLICATION_FOLDER, "fig_compared_to_previous_diff_keyvars"),
+  h = 1100,
+  w = 600,
+  format = "png",
+  limitsize= FALSE
+)
