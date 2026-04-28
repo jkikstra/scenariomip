@@ -25,7 +25,8 @@ the.ten <- c("CO2", "N2O", "BC", "OC", "CH4", "NH3", "Sulfur", "VOC", "NOx", "CO
 # Load data ----
 ## cmip6 scenarios ----
 cmip6.scenarios <- read_csv(
-  "C:/Users/kikstra/IIASA/ECE.prog - Documents/Projects/CMIP7/IAM Data Processing/IAM Files from CMIP6/SSP_CMIP6_201811.csv"
+  '/Users/jarmo/Library/CloudStorage/OneDrive-SharedLibraries-IIASA/ECE.prog - Documents/Projects/CMIP7/IAM Data Processing/IAM Files from CMIP6/SSP_CMIP6_201811.csv'
+  # "C:/Users/kikstra/IIASA/ECE.prog - Documents/Projects/CMIP7/IAM Data Processing/IAM Files from CMIP6/SSP_CMIP6_201811.csv"
 ) %>% allcaps_to_lower() %>% iamc_wide_to_long()
 cmip6.scenarios.global <- cmip6.scenarios %>% filter(region=="World") |>
   iamc_variable_keep_two_levels(level = c(2,3)) |>
@@ -72,7 +73,8 @@ rename_cmip7_scenarios <- function(df){
 
 ### Zenodo dataset ----
 cmip7.scenarios.global <- read_excel(
-  "C:\\Users\\kikstra\\OneDrive - IIASA\\_Other\\Data\\Scenario data\\Scenario Databases\\ScenarioMIP-CMIP7\\ScenarioMIP_emissions_marker_scenarios_v0.1.xlsx",
+  '/Users/jarmo/Library/CloudStorage/OneDrive-IIASA/_Other/Data/Scenario data/Scenario Databases/ScenarioMIP-CMIP7/ScenarioMIP_emissions_marker_scenarios_v0.1.xlsx',
+  # "C:\\Users\\kikstra\\OneDrive - IIASA\\_Other\\Data\\Scenario data\\Scenario Databases\\ScenarioMIP-CMIP7\\ScenarioMIP_emissions_marker_scenarios_v0.1.xlsx",
   sheet = "data"
 ) %>% iamc_wide_to_long() |>
   iamc_variable_keep_one_level(level=-1) |>
@@ -87,7 +89,8 @@ cmip7.scenarios.global |> distinct(scenario)
 
 ### add ML ----
 ml <- read_csv(
-  "C:/Users/kikstra/IIASA/ECE.prog - Documents/Projects/CMIP7/IAM Data Processing/ScenarioMIP Emulator workflow/08 March 2026 (COFFEE)/emissions/COFFEE 1.6/infilled_COFFEE 1.6.csv"
+  # "C:/Users/kikstra/IIASA/ECE.prog - Documents/Projects/CMIP7/IAM Data Processing/ScenarioMIP Emulator workflow/08 March 2026 (COFFEE)/emissions/COFFEE 1.6/infilled_COFFEE 1.6.csv"
+  '/Users/jarmo/Library/CloudStorage/OneDrive-SharedLibraries-IIASA/ECE.prog - Documents/Projects/CMIP7/IAM Data Processing/ScenarioMIP Emulator workflow/08 March 2026 (COFFEE)/emissions/COFFEE 1.6/infilled_COFFEE 1.6.csv'
 ) %>% iamc_wide_to_long()
 cmip7.scenarios.global.ml <- ml %>%
   iamc_variable_keep_one_level(level=-1) |>
@@ -108,7 +111,8 @@ cmip7.scenarios.global <- cmip7.scenarios.global %>%
 
 ## cmip7 history ----
 cmip7.history <- read_csv(
-  "C:/Users/kikstra/OneDrive - IIASA/_Other/Data/Emissions data/cmip7/global-workflow-history.csv"
+  # "C:/Users/kikstra/OneDrive - IIASA/_Other/Data/Emissions data/cmip7/global-workflow-history.csv"
+  '/Users/jarmo/Library/CloudStorage/OneDrive-IIASA/_Other/Data/Emissions data/cmip7/global-workflow-history.csv'
 ) %>% iamc_wide_to_long() |>
   mutate_cond(variable%in%c("Emissions|CO2|AFOLU", "Emissions|CO2|Energy and Industrial Processes"),
               variable="Emissions|CO2") %>%
@@ -123,51 +127,53 @@ cmip7.history |> distinct(variable,unit)
 
 ### china ----
 cmip7.history.chn <- vroom(
-  "C:/Users/kikstra/OneDrive - IIASA/_Other/Data/Emissions data/cmip7/country-history.csv"
+  # "C:/Users/kikstra/OneDrive - IIASA/_Other/Data/Emissions data/cmip7/country-history.csv"
+  '/Users/jarmo/Library/CloudStorage/OneDrive-IIASA/_Other/Data/Emissions data/cmip7/country-history.csv'
 ) %>% filter(region=="chn") %>%
   iamc_wide_to_long()
 
 
 
 ## cmip7: country-level (downscaled) ----
+path_downscaled <- '/Users/jarmo/Library/CloudStorage/OneDrive-SharedLibraries-IIASA/ECE.prog - Documents/Projects/CMIP7/IAM Data Processing/Shared emission fields data/v1_1/all_downscaled_markers_1-1-1/'
 cmip7.scenarios.china <- vroom(
   # H
-  "C:/Users/kikstra/Downloads/downscaled-only-h_1-1-0.csv"
+  file.path(path_downscaled, "downscaled-only-h_1-1-1.csv")
 ) %>%
   bind_rows(
     # HL
     vroom(
-      "C:/Users/kikstra/Downloads/downscaled-only-results_20260302_hl.csv"
+      file.path(path_downscaled, "downscaled-only-hl_1-1-1.csv")
     )
   ) %>%
   bind_rows(
     # M
     vroom(
-      "C:/Users/kikstra/Downloads/downscaled-only-results_20260302_m.csv"
+      file.path(path_downscaled, "downscaled-only-m_1-1-1.csv")
     )
   ) %>%
   bind_rows(
     # ML
     vroom(
-      "C:/Users/kikstra/Downloads/downscaled-only-results_20260309_ml.csv"
+      file.path(path_downscaled, "downscaled-only-ml_1-1-1.csv")
     )
   ) %>%
   bind_rows(
     # L
     vroom(
-      "C:/Users/kikstra/Downloads/downscaled-only-results_20260305_l.csv"
+      file.path(path_downscaled, "downscaled-only-l_1-1-1.csv")
     )
   ) %>%
   bind_rows(
     # LN
     vroom(
-      "C:/Users/kikstra/Downloads/downscaled-only-results_20260302_ln.csv"
+      file.path(path_downscaled, "downscaled-only-ln_1-1-1.csv")
     )
   ) %>%
   bind_rows(
     # VL
     vroom(
-      "C:/Users/kikstra/Downloads/downscaled-only-vl_1-1-0.csv"
+      file.path(path_downscaled, "downscaled-only-vl_1-1-1.csv")
     )
   ) %>%
   filter(country=="chn")
@@ -1050,8 +1056,9 @@ r1c2 <- ggplot(
   geom_line(
     data = hist.cmip6,
     aes(group = interaction(scenario)),
-    linewidth=1.3,
-    colour="darkgrey"
+    linewidth=0.5,
+    colour="darkgrey",
+    linetype="dashed"
   ) +
   geom_line(
     data = hist.cmip6.extension %>% filter(year>=2015),
@@ -1098,8 +1105,9 @@ r1c3 <- ggplot(
   geom_line(
     data = hist.cmip6,
     aes(group = interaction(scenario)),
-    linewidth=1.3,
-    colour="darkgrey"
+    linewidth=0.5,
+    colour="darkgrey",
+    linetype="dashed"
   ) +
   geom_line(
     data = hist.cmip6.extension %>% filter(year>=2015),
@@ -1327,7 +1335,8 @@ save_ggplot(
 
 ## Figure 2 ----
 ar6.history <- read_csv(
-  "C:/Users/kikstra/Downloads/history_ar6.csv"
+  '/Users/jarmo/Library/CloudStorage/OneDrive-IIASA/_Other/Data/Emissions data/cmip6/history_ar6.csv'
+  # "C:/Users/kikstra/Downloads/history_ar6.csv"
 ) %>%
   iamc_wide_to_long(upper.to.lower = T) %>%
   iamc_variable_keep_two_levels(levels = c(3,4)) %>%
@@ -1505,4 +1514,222 @@ save_ggplot(
   p = f2,
   f = here("figures", "ecmwf_march2026_f2_v1_2"),
   h = 250, w = 250
+)
+
+
+
+
+
+# EGU26 poster ----
+
+## Main figure ----
+ar6.history <- read_csv(
+  '/Users/jarmo/Library/CloudStorage/OneDrive-IIASA/_Other/Data/Emissions data/cmip6/history_ar6.csv'
+  # "C:/Users/kikstra/Downloads/history_ar6.csv"
+) %>%
+  iamc_wide_to_long(upper.to.lower = T) %>%
+  iamc_variable_keep_two_levels(levels = c(3,4)) %>%
+  filter(variable%nin%c("CO2|Energy and Industrial Processes","CO2|AFOLU")) %>%
+  iamc_variable_keep_one_level(level=1) %>%
+  filter(variable%in%the.ten) %>%
+  mutate_cond(variable=="VOC", variable="NMVOC") %>%
+  mutate_cond(variable=="Sulfur", variable="SO2") %>%
+  mutate_cond(variable=="CO2", value=value/1e3) %>%
+  mutate_cond(variable=="CO2", unit="Gt CO2/yr")
+
+f2_egu_plot <- function(species, nrow=1){
+  ggplot(
+    cmip6.scenarios.global |> filter(variable%in%species) |>
+      add_facet_label(),
+    aes(x = year, y = value)
+  ) +
+    facet_wrap(~facet_label, scales = "free_y", nrow = nrow) +
+
+    # cmip6 background
+    geom_line(
+      aes(colour=scenario, group = interaction(model, scenario)),
+      colour="darkgrey",
+      linewidth=0.7,
+      alpha=0.5
+    ) +
+    geom_line(
+      data = ar6.history %>% filter(variable%in%species, year>=1990) |>
+        add_facet_label(),
+      aes(group = interaction(scenario)),
+      colour="darkgrey",
+      linewidth=0.7
+    ) +
+
+    # cmip7 scenarios
+    geom_line(
+      data=cmip7.scenarios.global|> filter(variable%in%species) |>
+        add_facet_label(),
+      aes(colour=scenario, group = interaction(model, scenario)),
+      linewidth = 0.3,
+      linetype = "dashed",
+      alpha = 0.5
+    ) +
+    # highlight L
+    geom_line(
+      data=cmip7.scenarios.global|> filter(variable%in%species) |>
+        add_facet_label(),
+      aes(colour=scenario, group = interaction(model, scenario)),
+      linewidth = 1.3
+    ) +
+    # cmip7 history
+    geom_line(
+      data = cmip7.history %>% filter(variable%in%species, year>=1990) |>
+        add_facet_label(),
+      aes(group = interaction(scenario)),
+      linewidth=1.3,
+      colour="black"
+    ) +
+
+
+    scale_color_manual(breaks=SCENARIOS.7,values=SCENARIOS.7.COLOURS) +
+    scale_x_continuous(limits = c(2010,2100),expand = c(0,0)) +
+    theme_jsk() +
+    mark_history(sy = 2025) +
+    labs(y = NULL) +
+    theme(legend.title = element_blank(),
+          legend.position = "none")
+}
+
+f2_egu_subset_plot <- function(species, nrow=1){
+  ggplot(
+    cmip6.scenarios.global |> filter(variable%in%species) |>
+      # filter(scenario%in%c("SSP1-26","SSP3-70")) %>%
+      add_facet_label(),
+    aes(x = year, y = value)
+  ) +
+    facet_wrap(~facet_label, scales = "free_y", nrow = nrow) +
+
+    # cmip6 background
+    geom_line(
+      aes(colour=scenario, group = interaction(model, scenario)),
+      # colour="darkgrey",
+      linetype="dashed",
+      linewidth=0.7,
+      alpha=0.5
+    ) +
+    geom_line(
+      data = ar6.history %>% filter(variable%in%species, year>=1990) |>
+        add_facet_label(),
+      aes(group = interaction(scenario)),
+      colour="darkgrey",
+      linewidth=0.7
+    ) +
+
+    # cmip7 scenarios
+    # geom_line(
+    #   data=cmip7.scenarios.global|> filter(variable%in%species) |>
+    #     add_facet_label(),
+    #   aes(colour=scenario, group = interaction(model, scenario)),
+    #   linewidth = 0.3,
+    #   linetype = "dashed",
+    #   alpha = 0.5
+    # ) +
+    # highlight L
+    geom_line(
+      data=cmip7.scenarios.global|>
+        filter(variable%in%species) |>
+        # mutate(scenario="L") %>%
+        add_facet_label(),
+      aes(colour=scenario, group = interaction(model, scenario)),
+      linewidth = 1.2
+    ) +
+    # cmip7 history
+    geom_line(
+      data = cmip7.history %>% filter(variable%in%species, year>=1990) |>
+        add_facet_label(),
+      aes(group = interaction(scenario)),
+      linewidth=1.3,
+      colour="black"
+    ) +
+
+
+    scale_color_manual(breaks=c(SCENARIOS.6,SCENARIOS.7),values=c(SCENARIOS.6.COLOURS,SCENARIOS.7.COLOURS)) +
+    scale_x_continuous(limits = c(2010,2100),expand = c(0,0)) +
+    theme_jsk() +
+    mark_history(sy = 2025) +
+    labs(y = NULL) +
+    theme(legend.title = element_blank(),
+          legend.position = "none")
+}
+
+
+f2.co2 <- f2_egu_subset_plot(c("CO2")) +
+  scale_linetype_manual(
+    breaks = c(SCENARIOS.6,SCENARIOS.7),
+    values = setNames(
+      ifelse(c(SCENARIOS.6,SCENARIOS.7) == "L", "solid", "dashed"),
+      c(SCENARIOS.6,SCENARIOS.7)
+    )
+  ) +
+  guides(
+    colour = guide_legend(override.aes = list(linewidth = 1)),
+    linetype = guide_legend(override.aes = list(linewidth = 1))
+  ) +
+  theme(
+    legend.position = c(0.02, 0.98),
+    legend.justification = c(0, 1),
+    legend.background = element_rect(fill = alpha("white", 0.7)),
+    legend.box.background = element_rect(colour = "black", linewidth = 0.5),
+    legend.key.width = unit(1.5, "cm"),
+    legend.title = element_blank(),
+    legend.text = element_text(size = 8)
+  ) +
+    theme(legend.title = element_blank(),
+          legend.position = "none")
+# f2.co2
+
+f2.nonco2ghg <- f2_egu_subset_plot(c("CH4", "N2O")) +
+    theme(legend.title = element_blank(),
+          legend.position = "none")
+# f2.nonco2ghg
+
+slcf_list <- c("BC", "CO", "NH3", "NMVOC", "NOx", "OC", "SO2")
+f2.slcf <- f2_egu_subset_plot(slcf_list, nrow=4) +
+  # scale_linetype_manual(
+  #   breaks = c(SCENARIOS.6,SCENARIOS.7),
+  #   values = setNames(
+  #     ifelse(c(SCENARIOS.6,SCENARIOS.7) == "L", "solid", "dashed"),
+  #     c(SCENARIOS.6,SCENARIOS.7)
+  #   )
+  # ) +
+  guides(
+    colour = guide_legend(override.aes = list(linewidth = 1)),
+    linetype = guide_legend(override.aes = list(linewidth = 1))
+  ) +
+  theme(
+    # legend.position = c(0.9, 0.1),
+    legend.position = "right",
+    # legend.justification = c(1, 0),
+    legend.background = element_rect(fill = alpha("white", 0.7)),
+    legend.box.background = element_rect(colour = "black", linewidth = 0.5),
+    legend.key.width = unit(1.5, "cm"),
+    legend.title = element_blank(),
+    legend.text = element_text(size = 8)
+  )
+f2.slcf
+
+
+
+
+egu26.main <- (f2.co2 + f2.nonco2ghg + f2.slcf) +
+  labs(caption = "Dashed lines: selected CMIP6 scenarios.") +
+  plot_layout(
+    design = "
+    AACC
+    AACC
+    BBCC
+    "
+  )
+
+egu26.main
+scaler = 2
+save_ggplot(
+  p = egu26.main,
+  f = here("figures", "egu26_main"),
+  h = (365.8)/scaler, w = (721.1 + 90)/scaler
 )
