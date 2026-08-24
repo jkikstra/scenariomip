@@ -1,5 +1,10 @@
 #' Useful functions for the `decent` software package
 
+# Ensure a CRAN mirror is set (Rscript / non-interactive sessions have none by default) ----
+if (is.null(getOption("repos")) || getOption("repos")["CRAN"] %in% c("", "@CRAN@")) {
+  options(repos = c(CRAN = "https://cloud.r-project.org"))
+}
+
 # Install and load required packages -------------------------------------------
 required_packages <- c(
   "here", "tidyverse", "vroom", "readxl", "writexl", "openxlsx",
@@ -1922,6 +1927,7 @@ save_ggplot = function(p,f,h=150,w=150,format="png-pdf",unit="mm",
       height = h,
       width = w,
       unit = unit,
+      create.dir = TRUE,
       ...
     )
     ggsave(
@@ -1930,6 +1936,7 @@ save_ggplot = function(p,f,h=150,w=150,format="png-pdf",unit="mm",
       height = h,
       width = w,
       unit = unit,
+      create.dir = TRUE,
       ...
     )
   } else if (format=="png") {
@@ -1939,6 +1946,7 @@ save_ggplot = function(p,f,h=150,w=150,format="png-pdf",unit="mm",
       height = h,
       width = w,
       unit = unit,
+      create.dir = TRUE,
       ...
     )
   } else if (format=="pdf") {
@@ -1948,6 +1956,7 @@ save_ggplot = function(p,f,h=150,w=150,format="png-pdf",unit="mm",
       height = h,
       width = w,
       unit = unit,
+      create.dir = TRUE,
       ...
     )
   }
