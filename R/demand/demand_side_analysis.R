@@ -17,6 +17,18 @@ here::i_am("scenariomip.Rproj")
 
 source(here("R", "utils.R"))
 
+# ============================================================================
+# EDIT ME: point this at your own local copy of the ScenarioMIP demand data.
+# This path is machine-specific — everyone running this script needs to set
+# it themselves before anything below will work.
+# ============================================================================
+# IAM_SCENARIOS_LOCATION <- here("data", "data_vetting", "scens")
+IAM_SCENARIOS_LOCATION <- "C:/Users/zaini/OneDrive - IIASA/Documents/ScenarioMIP demand"
+
+# IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-02-17.csv"
+# IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-03-05.csv" # version 'demand_world_r5_total_directvariables_v20250307_a.zip'
+IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2026-02-20.csv"
+
 # Notes ----
 # The list of variables is here: https://docs.google.com/spreadsheets/d/1H65lrzcBBBoUYKc4rjt1sJdbdLTf7YMRM-n2k325FDU/edit?usp=sharing
 # This list was originally used to inquire with the teams whether they can extend their reporting, so this also gives an impression of what would be available from the models.
@@ -265,13 +277,6 @@ vars.all <- c(
 
 
 # Loading IAM data ----
-# IAM_SCENARIOS_LOCATION <- here("data", "data_vetting", "scens")
-IAM_SCENARIOS_LOCATION <- "C:/Users/zaini/OneDrive - IIASA/Documents/ScenarioMIP demand"
-
-# IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-02-17.csv"
-# IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-03-05.csv" # version 'demand_world_r5_total_directvariables_v20250307_a.zip'
-IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2026-02-20.csv"
-
 scenarios.alldata <- load_csv_iamc(file.path(IAM_SCENARIOS_LOCATION, IAM_SCENARIOS_FILE), mode = "fast")
 
 
