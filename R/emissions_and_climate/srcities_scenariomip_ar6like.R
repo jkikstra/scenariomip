@@ -4,6 +4,7 @@
 # * Dates edited:
 # * - March, 12, 2026 (first run)
 # * - March, 19, 2026 (add MESSAGE, write out data)
+# * - July, 3, 2026 (final ScenarioMIP marker emissions data): as run under '/Users/jarmo/Library/CloudStorage/OneDrive-IIASA/_Other/ClimateAssessmentRun2026 - SRCITIES_ScenarioMIP/run_20260703'
 # ********************************************************
 
 
@@ -23,6 +24,13 @@ library("ggthemes")
 here::i_am("scenariomip.Rproj")
 
 source(here("R","utils.R"))
+
+# Base path for data ----
+PATH.srcities.scenariomip.data <- '/Users/jarmo/Library/CloudStorage/OneDrive-IIASA/_Other/ClimateAssessmentRun2026 - SRCITIES_ScenarioMIP'
+PATH.climate.run <- file.path(PATH.srcities.scenariomip.data, 'run_20260703','output')
+PATH.other.data <- file.path(PATH.srcities.scenariomip.data, 'other_data')
+FILE.climate.run <- file.path(PATH.climate.run, 'SRCITIES_ScenarioMIP_20260703_alloutput.xlsx')
+
 
 # Ten core species ----
 the.ten <- c(#"CO2",
@@ -107,59 +115,42 @@ rename_cmip7_scenarios <- function(df){
 
 ### CMIP7-like: Zenodo dataset ----
 scenariomip.like7 <- read_excel(
-  "C:\\Users\\kikstra\\OneDrive - IIASA\\_Other\\Data\\Scenario data\\Scenario Databases\\ScenarioMIP-CMIP7\\ScenarioMIP_emissions_marker_scenarios_v0.1.xlsx",
+  file.path(PATH.srcities.scenariomip.data, 'other_data', 'cmip7', 'ScenarioMIP_emissions_marker_scenarios_v0.2.xlsx'),
   sheet = "data"
 ) %>%
-  bind_rows(
-    # add ML: temps
-    read_csv(
-      "C:/Users/kikstra/IIASA/ECE.prog - Documents/Projects/CMIP7/IAM Data Processing/ScenarioMIP Emulator workflow/08 March 2026 (COFFEE)/climate-assessment/COFFEE 1.6/assessed-warming-timeseries-quantiles_COFFEE 1.6.csv"
-    ) %>% mutate(scenario = "Medium-to-Low - SSP2 (Marker)") %>%
-      mutate(variable=paste(variable,"-",quantile, "-", climate_model)) %>%
-      select(-quantile,-climate_model)
-  ) %>%
-  bind_rows(
-    # add ML: emissions
-    read_csv(
-      "C:/Users/kikstra/IIASA/ECE.prog - Documents/Projects/CMIP7/IAM Data Processing/ScenarioMIP Emulator workflow/08 March 2026 (COFFEE)/emissions/COFFEE 1.6/infilled_COFFEE 1.6.csv"
-    ) %>% mutate(scenario = "Medium-to-Low - SSP2 (Marker)",
-                 variable = paste0("Infilled|",variable))
-  ) %>%
-  bind_rows(
-    # add ML: ERW
-    read_csv(
-      "C:/Users/kikstra/IIASA/ECE.prog - Documents/Projects/CMIP7/IAM Data Processing/ScenarioMIP Emulator workflow/08 March 2026 (COFFEE)/climate-assessment/COFFEE 1.6/erf-timeseries-quantiles_COFFEE 1.6.csv"
-    ) %>% mutate(scenario = "Medium-to-Low - SSP2 (Marker)") %>%
-      mutate(variable=paste(variable,"-",quantile, "-", climate_model)) %>%
-      select(-quantile,-climate_model)
-  ) %>%
   iamc_wide_to_long()
 scenariomip.like7 |> distinct(variable,unit)
 scenariomip.like7 |> distinct(scenario)
 
 ### CMIP7-like: history ----
 cmip7.history <- read_csv(
-  "C:/Users/kikstra/OneDrive - IIASA/_Other/Data/Emissions data/cmip7/global-workflow-history.csv"
+  file.path(PATH.srcities.scenariomip.data, 'other_data', 'cmip7', 'global-workflow-history.csv')
 ) %>% iamc_wide_to_long()
 
 
 ### AR6-like: ran locally on Jarmo's laptop ----
+fix_scenario_names <- function(df){
+  df %>%
+    mutate(new_scenario_name = NA_character_) %>%
+    # general renaming
+    # tbd...
+    # markers
+    mutate_cond(model == "AIM 3.0" & scenario == "SSP2 - Low Overshoot_a", new_scenario_name = "Low-to-Negative - SSP2 (Marker)") |>
+    mutate_cond(model == "REMIND-MAgPIE 3.5-4.11" & scenario == "SSP1 - Very Low Emissions", new_scenario_name = "Very Low - SSP1 (Marker)") |>
+    mutate_cond(model == "MESSAGEix-GLOBIOM-GAINS 2.1-M-R12" & scenario == "SSP2 - Low Emissions", new_scenario_name = "Low - SSP2 (Marker)") |>
+    mutate_cond(model == "COFFEE 1.6" & scenario == "SSP2 - Medium-Low Emissions", new_scenario_name = "Medium-to-Low - SSP2 (Marker)") |>
+    mutate_cond(model == "IMAGE 3.4" & scenario == "SSP2 - Medium Emissions", new_scenario_name = "Medium - SSP2 (Marker)") |>
+    mutate_cond(model == "WITCH 6.0" & scenario == "SSP5 - Medium-Low Emissions_a", new_scenario_name = "High-to-Low - SSP5 (Marker)") |>
+    mutate_cond(model == "GCAM 8s" & scenario == "SSP3 - High Emissions", new_scenario_name = "High - SSP3 (Marker)") %>%
+    return()
+}
 scenariomip.like6 <- read_excel(
-  "C:/Users/kikstra/OneDrive - IIASA/_Other/ClimateAssessmentRun2026 - SRCITIES_ScenarioMIP/run_20260312/output/v1/SRCITIES_ScenarioMIP_alloutput.xlsx",
+  FILE.climate.run,
   sheet = "data"
 ) %>% upper_to_lower() %>% mutate(full.model.name=model) %>%
   fix_scenario_names() %>%
   mutate(scenario=new_scenario_name) %>% select(-new_scenario_name, -full.model.name) %>%
-  iamc_wide_to_long() %>%
-  bind_rows(
-    read_excel(
-      "C:/Users/kikstra/OneDrive - IIASA/_Other/ClimateAssessmentRun2026 - SRCITIES_ScenarioMIP/run_20260318/output/v1/onlyMESSAGE_SRCITIES_ScenarioMIP_alloutput.xlsx",
-      sheet = "data"
-    ) %>% upper_to_lower() %>% mutate(full.model.name=model) %>%
-      fix_scenario_names() %>%
-      mutate(scenario=new_scenario_name) %>% select(-new_scenario_name, -full.model.name) %>%
-      iamc_wide_to_long()
-  )
+  iamc_wide_to_long() 
 
 scenariomip.like6 |> distinct(variable,unit)
 scenariomip.like6 |> distinct(scenario)
@@ -167,7 +158,7 @@ scenariomip.like6 |> distinct(scenario)
 
 ### AR6-like: history ----
 ar6.history <- read_csv(
-  "C:/Users/kikstra/Downloads/history_ar6.csv"
+  file.path(PATH.other.data, 'cmip6', 'history_ar6.csv')
 ) %>%
   iamc_wide_to_long(upper.to.lower = T)
 
@@ -239,7 +230,7 @@ f1a <- ggplot(mapping=aes(x=year)) +
        title = "ScenarioMIP-CMIP7 emissions and climate",
        subtitle = "CO2 emissions trajectories") +
   scale_color_manual(breaks=SCENARIOS.7,values=SCENARIOS.7.COLOURS) +
-  scale_fill_manual(breaks=SCENARIOS.7,values=SCENARIOS.7.COLOURS) +
+  # scale_fill_manual(breaks=SCENARIOS.7,values=SCENARIOS.7.COLOURS) +
   scale_x_continuous(expand = c(0,0))
 f1a
 
@@ -500,7 +491,7 @@ temp.p50.srcities.plot
 
 save_ggplot(
   p = temp.p50.srcities.plot,
-  f = here("figures", "scenariomip_forSRCITIES_TEMPS_ar6like_v2"),
+  f = here("figures", "scenariomip_forSRCITIES_TEMPS_ar6like_v3"),
   h = 200, w = 200
 )
 
@@ -602,7 +593,7 @@ compare_data <- (temp.p50 + em10 + erw.p50) + plot_layout(
 
 save_ggplot(
   p = compare_data,
-  f = here("figures", "scenariomip_forSRCITIES_ar6-vs-cmip7_with-history_v2"),
+  f = here("figures", "scenariomip_forSRCITIES_ar6-vs-cmip7_with-history_v3"),
   h = 800, w = 300
 )
 
@@ -618,7 +609,7 @@ scenariomip.like6.infilled <- scenariomip.like6 %>% iamc_long_to_wide() %>%
 
 
 write_delim(x = scenariomip.like6.infilled,
-            file = "C:/Users/kikstra/OneDrive - IIASA/_Other/ClimateAssessmentRun2026 - SRCITIES_ScenarioMIP/emissions_for_scm/emissions_for_scm_v2.csv",
+            file = file.path(PATH.srcities.scenariomip.data, "emissions_for_scm/emissions_for_scm_v3.csv"),
             delim = ","
 )
 
@@ -631,7 +622,46 @@ scenariomip.like6.temperature <- scenariomip.like6 %>% iamc_long_to_wide() %>%
 
 
 write_delim(x = scenariomip.like6.temperature,
-            file = "C:/Users/kikstra/OneDrive - IIASA/_Other/ClimateAssessmentRun2026 - SRCITIES_ScenarioMIP/temperature_from_scm/temperature_magicc_v2.csv",
+            file = file.path(PATH.srcities.scenariomip.data, "temperature_from_scm/temperature_magicc_v3.csv"),
+            delim = ","
+)
+
+
+# Differences emissions and temperature data (v2 vs. v3) ----
+
+temp.v2 <- read_csv(file.path(PATH.srcities.scenariomip.data, "temperature_from_scm/temperature_magicc_v2.csv")) %>% 
+  iamc_wide_to_long()
+temp.v3 <- read_csv(file.path(PATH.srcities.scenariomip.data, "temperature_from_scm/temperature_magicc_v3.csv")) %>% 
+  iamc_wide_to_long()
+temp <- temp.v3 %>% mutate(version="v3") %>% 
+  bind_rows(temp.v2 %>% mutate(version="v2"))
+
+temp.diff <- temp %>% pivot_wider(names_from = version, values_from = value) %>% 
+  mutate(diff = v3-v2)
+View(temp.diff)
+temp.diff %>%
+  filter(diff!=0) %>% 
+  distinct(scenario)
+write_delim(x = temp.diff,
+            file = file.path(PATH.srcities.scenariomip.data, "temperature_from_scm/temperature_magicc_diff_v3_v2.csv"),
+            delim = ","
+)
+
+em.v2 <- read_csv(file.path(PATH.srcities.scenariomip.data, "emissions_for_scm/emissions_for_scm_v2.csv")) %>% 
+  iamc_wide_to_long()
+em.v3 <- read_csv(file.path(PATH.srcities.scenariomip.data, "emissions_for_scm/emissions_for_scm_v3.csv")) %>% 
+  iamc_wide_to_long()
+em <- em.v3 %>% mutate(version="v3") %>% 
+  bind_rows(em.v2 %>% mutate(version="v2"))
+
+em.diff <- em %>% pivot_wider(names_from = version, values_from = value) %>% 
+  mutate(diff = v3-v2)
+View(em.diff)
+em.diff %>%
+  filter(diff!=0) %>% 
+  distinct(scenario)
+write_delim(x = em.diff,
+            file = file.path(PATH.srcities.scenariomip.data, "emissions_for_scm/emissions_for_scm_diff_v3_v2.csv"),
             delim = ","
 )
 
