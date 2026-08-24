@@ -16,6 +16,9 @@ figures_data
 # User-specific files
 .Ruserdata
 
+# Mac files
+.DS_Store
+
 # Example code in package build process
 *-Ex.R
 
