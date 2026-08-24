@@ -75,15 +75,50 @@ for index, (m, s) in enumerate(zip(props['model'], props['scenario'])):
 ")
 
 # Recombine the data files from each model into one file
-SCENARIO.FILES.FOLDER <- here("data", "downloading_iters")
+SCENARIO.FILES.FOLDER <- here("data", "downloading_iters_3")
+# SCENARIO.FILES.FOLDER <- here("data", "trial")
+
 FILES.csv <- file.path(SCENARIO.FILES.FOLDER, dir(SCENARIO.FILES.FOLDER, pattern = "*.csv"))  # get file names
 FILES.csv <- FILES.csv[!grepl(FILES.csv, pattern="MESSAGEix-GLOBIOM 2.1-M-R12",fixed=T)]
+
+# Only for the ScenarioMIP DEMAND analysis, speed up the code by removing all the useless variables
+drop_terms <- c("Agricultural","Capacity","Capital", "Land Cover", "Forestry", "Trade", "Yield", "climate", "Food", "Water", "Biodiversity",
+                # "Emissions",
+                "Carbon Capture","Carbon Removal", "Investment","Primary Energy","Secondary Energy","Price", "Capital", "Lifetime")
+pattern <- paste(drop_terms, collapse="|")      # build once
+
 scenarios_csv <- FILES.csv %>%
-  map(~ (load_csv_iamc(.) %>% iamc_wide_to_long() %>% filter(year<=2100) ) ) %>%
+  map(~ (load_csv_iamc(., mode = "fast") %>%
+           filter(!grepl(pattern, Variable, ignore.case = TRUE, perl = TRUE)) %>% # Only for the ScenarioMIP DEMAND analysis, speed up the code by removing all the useless variables
+           filter(
+             !grepl("^Emissions\\|", Variable) |                      # scrap emission variables...
+               Variable == "Emissions|CO2" |                          # ...but keep this exact one
+               grepl("Emissions\\|CO2\\|Energy\\|Demand", Variable)   # ...and anything with this substring
+           ) %>%           filter(!grepl("GCAM 7.1", Model)) %>% # in this specific case, there is a newer version that should be considered (GCAM 8s)
+           iamc_wide_to_long() %>%
+           filter(year <= 2100))) %>%
   reduce(rbind) %>%
   drop_na() %>%
   arrange(Model, Scenario, Region, Unit, year) %>%
   iamc_long_to_wide()
+
+# scenarios_csv_1 = scenarios_csv
+# scenarios_csv_2 = scenarios_csv
+# scenarios_csv_3 = scenarios_csv
+scenarios_csv = bind_rows(scenarios_csv_1, scenarios_csv_2, scenarios_csv_3)
+
+# If I want to check the time:
+
+# library(tictoc)
+
+# tic("read + long")
+# lst <- purrr::map(FILES.csv, ~ load_csv_iamc(.x, mode="fast") |> iamc_wide_to_long())
+# tic("bind rows")
+# df  <- dplyr::bind_rows(lst)
+# tic("filter + arrange")
+# df2 <- df |> dplyr::filter(year <= 2100) |> dplyr::arrange(Model, Scenario, Region, Unit, year)
+# toc(); toc(); toc()  # prints times for each block
+
 iamc_cols <- c("Model", "Scenario", "Region", "Variable", "Unit")
 df_cols <- scenarios_csv %>% colnames() %>% sort
 year_cols_ordered <- setdiff(df_cols, iamc_cols)
@@ -121,3 +156,8 @@ write_delim(
 #   file = here("data", paste0("scenarios_floorspace_", Sys.Date(),"-message.csv")),
 #   delim = ","
 # )
+
+
+# df.entire.check <- read_csv("C:\\Users\\zaini\\Documents\\GitHub\\scenariomip\\data\\downloading_iters\\scenarios_scenariomip_GCAM 7.1 scenarioMIP_SSP1 - Very Low Emissions.csv")
+
+# vars.toomany <- as_tibble(unique(df.entire.check$Variable))

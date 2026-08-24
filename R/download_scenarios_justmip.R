@@ -97,7 +97,7 @@ for index, (m, s) in enumerate(zip(props['model'], props['scenario'])):
 ")
 
 # Recombine the data files from each model into one file
-SCENARIO.FILES.FOLDER <- here("data", "justmip", "downloading_iters")
+SCENARIO.FILES.FOLDER <- here("data", "justmip")
 
 # a) You want to pick all the downloaded data
 FILES.csv <- file.path(SCENARIO.FILES.FOLDER, dir(SCENARIO.FILES.FOLDER, pattern = "*.csv"))  # get file names
@@ -105,26 +105,38 @@ FILES.csv <- FILES.csv[!grepl(FILES.csv, pattern="MESSAGEix-GLOBIOM 2.1-M-R12",f
 
 # b) only some selected scenario data
 wanted_scenarios <- c(
-  "justmip_REMIND-MAgPIE 3.5-4.10_SSP1_800f.csv",
-  "justmip_REMIND-MAgPIE 3.5-4.10_SSP2_800f.csv"
+  "justmip-image-ssp1_800f.csv",
+  "justmip-image-ssp2_800f.csv"
 )
 # if those are just the basenames, build full paths:
 FILES.csv <- file.path(SCENARIO.FILES.FOLDER, wanted_scenarios)
+# if just one specific csv file:
+# FILES.csv <- here("data", "justmip", "justmip_COFFEE.csv")
 
 # Clean up the data
+# scenarios_csv <- FILES.csv %>%
+#   map(~ (load_csv_iamc(.) %>% iamc_wide_to_long() %>% filter(year<=2100) ) ) %>%
+#   reduce(rbind) %>%
+#   drop_na() %>%
+#   # arrange(Model, Scenario, Region, Unit, year) %>%
+#   arrange(model, scenario, region, unit, year) %>%
+#   iamc_long_to_wide()
+
 scenarios_csv <- FILES.csv %>%
-  map(~ (load_csv_iamc(.) %>% iamc_wide_to_long() %>% filter(year<=2100) ) ) %>%
+  map(~ (load_csv_iamc(.) %>% filter(year<=2100) ) ) %>%
   reduce(rbind) %>%
   drop_na() %>%
-  arrange(Model, Scenario, Region, Unit, year) %>%
-  iamc_long_to_wide()
+  arrange(model, scenario, region, unit, year) %>%
+  iamc_long_to_wide() %>%
+  lower_to_upper()
+
 iamc_cols <- c("Model", "Scenario", "Region", "Variable", "Unit")
 df_cols <- scenarios_csv %>% colnames() %>% sort
 year_cols_ordered <- setdiff(df_cols, iamc_cols)
 year_cols_mult5 <- year_cols_ordered[as.integer(year_cols_ordered) %% 5 == 0] # pick only the multiples of 5
 sorted_iamc <- c(iamc_cols, year_cols_mult5)
 scenarios_csv_o <- scenarios_csv %>% select(all_of(sorted_iamc))
-scenarios_csv_o <- scenarios_csv_o %>% mutate(Region = sub("^.*\\|", "", Region))  # Clean up the region names by removing the model name before the `|` symbol
+# scenarios_csv_o <- scenarios_csv_o %>% mutate(Region = sub("^.*\\|", "", Region))  # Clean up the region names by removing the model name before the `|` symbol
 
 
 # delete some unnecessary data (or data that otherwise needs to be removed)
@@ -133,13 +145,13 @@ scenarios_csv_o <- scenarios_csv_o %>% filter(
   # !(Model=="AIM 3.0" & Scenario=="SSP2 - High Emissions"),
   !(Model=="MESSAGEix-GLOBIOM 2.1-M-R12")
 ) %>%
-  select(-c(`2105`,`2110`,`2115`,`2120`,`2125`,`2130`,`2135`,`2140`,`2145`,`2150`)) %>%
-  colnames()
+  # select(-c(`2105`,`2110`,`2115`,`2120`,`2125`,`2130`,`2135`,`2140`,`2145`,`2150`)) %>%
+  select(-c(`1995`, `2000`))
 
 write_delim(
   x = scenarios_csv_o,
   # file = here("data", "justmip", paste0("scenarios_justmip_allmodels_", Sys.Date(),"_b.csv")),
-  file = here("data", "justmip", paste0("scenarios_justmip_REMIND_", Sys.Date(),".csv")),
+  file = here("data", "justmip", paste0("scenarios_justmip_IMAGE_", Sys.Date(),".csv")),
   delim = ","
 )
 

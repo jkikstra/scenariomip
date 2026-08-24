@@ -166,7 +166,7 @@ pop.unit <- million # assume population is in millions.
 # Variable selection ----
 
 ## Survey list
-vars.survey <- vroom(here("data", "demand", "Demand_Variable_Survey.csv"), skip = 7) %>%
+vars.survey <- vroom(here("data", "demand", "Demand_Variable_Survey.csv"), skip = 7, show_col_types = F) %>%
   pull(Variable)
 
 ## Misc
@@ -176,6 +176,8 @@ vars.fe <- c(
   "Final Energy",
   "Final Energy|Industry",
   "Final Energy|Residential and Commercial",
+  "Final Energy|Residential",
+  "Final Energy|Commercial",
   "Final Energy|Transportation",
   "Final Energy|Non-Energy Use",
   "Final Energy|Electricity",
@@ -183,59 +185,110 @@ vars.fe <- c(
   "Final Energy|Industry|Electricity",
   "Final Energy|Residential and Commercial|Electricity"
 )
-# to calculate:
-# share of electricity in final energy (per sector)
+
+# # Other possibly useful variables:
+# data.energyservice <- scenarios_csv_o %>% filter(grepl('Energy Service', Variable))
+# unique(data.energyservice$Variable)
+# data.floorspace <- scenarios_csv_o %>% filter(grepl('Floor', Variable))
+# unique(data.floorspace$Model) # Models that have floorspace data: GCAM, IMAGE, MESSAGE. But, afaik, at least also REMIND should have them.
+# # Data on appliances, only from GCAM (but IMAGE should also have them!)
+# data.appliances <- scenarios_csv_o %>% filter(grepl('Appliance', Variable))
+# unique(data.appliances$Variable)
+# unique(data.appliances$Model)
+# data.pkm <- scenarios_csv_o %>% filter(grepl('Passenger', Variable))
+
+vars.other.services <- c(
+  "Building Stock|Residential|Floor Space|Gross",
+  "Building Stock|Residential|Floor Space|Useful",
+  "Building Stock|Commercial|Floor Space|Gross",
+  "Building Stock|Commercial|Floor Space|Useful",
+  "Population|Appliance Access|Other|Total",
+  "Population|Appliance Access|Other|Rural",
+  "Population|Appliance Access|Other|Urban",
+  "Energy Service|Residential|Total|Appliance Ownership|Other",
+  "Energy Service|Residential|Rural|Appliance Ownership|Other",
+  "Energy Service|Residential|Urban|Appliance Ownership|Other"
+  )
+
+vars.ue <- c(
+  "Useful Energy",
+  "Useful Energy|Industry",
+  "Useful Energy|Industry|Electricity",
+  "Useful Energy|Industry|Gases",
+  "Useful Energy|Industry|Heat",
+  "Useful Energy|Industry|Hydrogen",
+  "Useful Energy|Industry|Liquids",
+  "Useful Energy|Industry|Solids",
+  "Useful Energy|Residential and Commercial",
+  "Useful Energy|Residential",
+  "Useful Energy|Commercial",
+  "Useful Energy|Residential and Commercial|Electricity",
+  "Useful Energy|Residential and Commercial|Gases",
+  "Useful Energy|Residential and Commercial|Heat",
+  "Useful Energy|Residential and Commercial|Liquids",
+  "Useful Energy|Residential and Commercial|Solids",
+  "Useful Energy|Transportation",
+  "Useful Energy|Transportation|Electricity",
+  "Useful Energy|Transportation|Gases",
+  "Useful Energy|Transportation|Hydrogen",
+  "Useful Energy|Transportation|Liquids" )
+
+# CO2 Emission variables, to compute emission intensity
+
+# check <- scenarios.alldata %>% filter(grepl("Emissions", Variable)) %>% pull(Variable) %>% unique()
+
+vars.emi <- c(
+  # "Emissions|CO2",
+  "Emissions|CO2|Energy|Demand",
+  "Emissions|CO2|Energy|Demand|Residential and Commercial",
+  "Emissions|CO2|Energy|Demand|Residential",
+  "Emissions|CO2|Energy|Demand|Commercial",
+  "Emissions|CO2|Energy|Demand|Transportation",
+  "Emissions|CO2|Energy|Demand|Transportation|Domestic Aviation",
+  "Emissions|CO2|Energy|Demand|Transportation|Rail",
+  "Emissions|CO2|Energy|Demand|Industry"
+  # "Emissions|CO2|Energy|Demand|Other Sector"
+)
 
 ## Full list of variables
 vars.all <- c(
   vars.survey,
   vars.socioecon,
-  vars.fe
+  vars.other.services,
+  vars.fe,
+  vars.ue,
+  vars.emi
 )
 
-vars.all.plus.UE <- c(vars.all,
-                      "Useful Energy",
-                      "Useful Energy|Industry",
-                      "Useful Energy|Industry|Electricity",
-                      "Useful Energy|Industry|Gases",
-                      "Useful Energy|Industry|Heat",
-                      "Useful Energy|Industry|Hydrogen",
-                      "Useful Energy|Industry|Liquids",
-                      "Useful Energy|Industry|Solids",
-                      "Useful Energy|Residential and Commercial",
-                      "Useful Energy|Residential",
-                      "Useful Energy|Commercial",
-                      "Useful Energy|Residential and Commercial|Electricity",
-                      "Useful Energy|Residential and Commercial|Gases",
-                      "Useful Energy|Residential and Commercial|Heat",
-                      "Useful Energy|Residential and Commercial|Liquids",
-                      "Useful Energy|Residential and Commercial|Solids",
-                      "Useful Energy|Transportation",
-                      "Useful Energy|Transportation|Electricity",
-                      "Useful Energy|Transportation|Gases",
-                      "Useful Energy|Transportation|Hydrogen",
-                      "Useful Energy|Transportation|Liquids" )
+# TODO: add inequality variables
+# e.g. "Consumption|Housing|Energy|D1 [Share]" (from GCAM or IMAGE), "Income|D1 [Share]"
+
+
 # Loading IAM data ----
 # IAM_SCENARIOS_LOCATION <- here("data", "data_vetting", "scens")
 IAM_SCENARIOS_LOCATION <- "C:/Users/zaini/OneDrive - IIASA/Documents/ScenarioMIP demand"
 
 # IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-02-17.csv"
 # IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-03-05.csv" # version 'demand_world_r5_total_directvariables_v20250307_a.zip'
-IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2025-07-22.csv"
+IAM_SCENARIOS_FILE <- "scenarios_scenariomip_allmodels_2026-02-20.csv"
 
 scenarios.alldata <- load_csv_iamc(file.path(IAM_SCENARIOS_LOCATION, IAM_SCENARIOS_FILE), mode = "fast")
 
 
 # only keep relevant variables
 scenarios <- scenarios.alldata %>%
-  filter(Variable %in% vars.all.plus.UE)
+  filter(Variable %in% vars.all)
 rm(scenarios.alldata) # remove large dataframe from environment to free up RAM
 gc()
+
+if("GCAM 8s" %in% scenarios$Model) { # remove the duplicate, and keep only the most recent GCAM version
+  scenarios <- scenarios %>% filter(Model != "GCAM 7.1 scenarioMIP")
+}
 
 # to long format
 scenarios <- scenarios %>%
   iamc_wide_to_long(upper.to.lower = T) %>%
-  filter(year %in% seq(1990, 2100, 5))
+  filter(year %in% seq(2020, 2100, 5))
 
 # add some extra helpful information
 scenarios <- scenarios %>%
@@ -257,23 +310,111 @@ model.list.simple <- scenarios %>%
 
 
 vars.available.across.IAMs <- scenarios %>%
-  filter(variable %in% vars.all.plus.UE) %>%
+  filter(variable %in% vars.all) %>%
   summarise(
     present = any(!is.na(value)),
     .by    = c(variable, full.model.name)
   ) %>%
   # ensure every variable from vars.all shows up
-  complete(variable = vars.all.plus.UE, full.model.name) %>%
+  complete(variable = vars.all, full.model.name) %>%
   pivot_wider(
     names_from  = full.model.name,
     values_from = present
   )
 
-write_xlsx(vars.available.across.IAMs, file.path(IAM_SCENARIOS_LOCATION, "available demand variables IAMs 22.07.25.xlsx"))
+# write_xlsx(vars.available.across.IAMs, file.path(IAM_SCENARIOS_LOCATION, "available demand variables IAMs 20_02_2026.xlsx"))
+
+
+### Ad-hoc adjustment for analysis on 31.10.25: fix duplicate floor space reporting
+
+# for simplicity, I copy the values that IMAGE (model D) reports in Building Stock|Residential|Floor Space|Useful --> into Energy Service|Residential|Floor Space
+
+scenarios <- scenarios %>%
+  filter(!(model == "IMAGE" & variable == "Energy Service|Residential|Floor Space"))
+
+image_floorspace_resid_renamed <- scenarios %>%
+  filter(
+    model == "IMAGE",
+    variable == "Building Stock|Residential|Floor Space|Useful"
+  ) %>%
+  # 2) Create the new variable name but keep the same values & other columns
+  mutate(variable = "Energy Service|Residential|Floor Space")
+
+# TODO: also change name of MESSAGE's floor space variable for its marker scenario
+message_floorspace_resid_renamed <- scenarios %>%
+  filter(
+    model == "MESSAGE",
+    variable == "Building Stock|Residential|Floor Space|Gross"
+  ) %>%
+  # 2) Create the new variable name but keep the same values & other columns
+  mutate(variable = "Energy Service|Residential|Floor Space")
+
+message_floorspace_commercial_renamed <- scenarios %>%
+  filter(
+    model == "MESSAGE",
+    variable == "Building Stock|Commercial|Floor Space|Gross"
+  ) %>%
+  # 2) Create the new variable name but keep the same values & other columns
+  mutate(variable = "Energy Service|Commercial|Floor Space")
+
+scenarios <- bind_rows(scenarios, image_floorspace_resid_renamed, message_floorspace_resid_renamed, message_floorspace_commercial_renamed)
+
+scenarios <- scenarios %>%
+  arrange(model, scenario, region, variable, year, target, ssp)
+
+
+
+# keep only the latest scenarios (remove duplicates)
+all.modscen.combos <- scenarios %>% distinct(model, scenario)
+
+# Remove the duplicate scenarios
+scenarios <- scenarios %>%
+  filter(
+    # For MESSAGE, keep only labels without suffix
+    !(model == "MESSAGE" & str_detect(scenario, "(_a|_b|_c|_d|_e|_f)$")),
+    # For AIM, keep only the "SSP2 - Low Overshoot_a" variant (marker)
+    !(model == "AIM" & str_detect(scenario, "(_b|_c|_d|_e|_f)$")),
+    !(model == "AIM" & scenario == "SSP2 - Low Overshoot"),
+    # IMAGE
+    !(model == "IMAGE" & scenario=="SSP1 - Low Overshoot"), # keep only "SSP1 - Low Overshoot_a"
+    !(model == "IMAGE" & scenario=="SSP1 - Medium Emissions"), # keep only "SSP1 - Medium Emissions_a"
+    !(model == "IMAGE" & scenario=="SSP2 - Low Overshoot"), # keep only "SSP2 - Low Overshoot_a"
+    !(model == "IMAGE" & scenario=="SSP2 - Medium Emissions_a"), # keep only "SSP2 - Medium Emissions" - marker scenario
+    !(model == "IMAGE" & scenario=="SSP2 - Very Low Emissions"), # keep only "SSP2 - Very Low Emissions_a"
+    # REMIND
+    !(model == "REMIND" & scenario %in% c("SSP1 - Low Emissions", "SSP1 - Low Emissions_c")), # keep only "SSP1 - Low Emissions_d"
+    !(model == "REMIND" & scenario == "SSP1 - Very Low Emissions_c"), # keep only "SSP1 - Very Low Emissions" - marker scenario
+    !(model == "REMIND" & scenario %in% c("SSP2 - Low Emissions", "SSP2 - Low Emissions_c")), # keep only "SSP2 - Low Emissions_d"
+    !(model == "REMIND" & scenario %in% c("SSP2 - Low Overshoot", "SSP2 - Low Overshoot_b", "SSP2 - Low Overshoot_c")), # keep only "SSP2 - Low Overshoot_d"
+    !(model == "REMIND" & scenario %in% c("SSP2 - Very Low Emissions")) # keep only "SSP2 - Very Low Emissions_c"
+    # COFFEE, GCAM, WITCH no duplicate scenarios
+  )
+
+# check.modscen.combos <- scenarios %>% distinct(model, scenario)
+
+# Marker scenarios
+scenarios <- scenarios %>%
+  mutate(marker = "non-marker")
+
+scenarios <- scenarios %>%
+  mutate_cond(model == "WITCH" & scenario == "SSP5 - Medium-Low Emissions_a", marker = "marker") %>%
+  mutate_cond(model == "GCAM" & scenario == "SSP3 - High Emissions", marker = "marker") %>%
+  mutate_cond(model == "MESSAGE" & scenario == "SSP2 - Low Emissions", marker = "marker") %>%
+  mutate_cond(model == "COFFEE" & scenario == "SSP2 - Medium-Low Emissions", marker = "marker") %>%
+  mutate_cond(model == "IMAGE" & scenario == "SSP2 - Medium Emissions", marker = "marker") %>%
+  mutate_cond(model == "AIM" & scenario == "SSP2 - Low Overshoot_a", marker = "marker") %>%
+  mutate_cond(model == "REMIND" & scenario == "SSP1 - Very Low Emissions", marker = "marker")
+
+modscen.combos.clean <- scenarios %>% distinct(model, scenario, marker)
+
+### end of ad-hoc modification
+
+# vars.all <- "Energy Service|Residential|Floor Space"
+
 
 ### AD-HOC lines to anonymize model names
-# # Mapping in case need to anonymize model name
-#
+# Mapping in case need to anonymize model name
+
 # model.anonymization <- c(
 #   "AIM" = "Model A",
 #   "COFFEE" = "Model B",
@@ -298,6 +439,8 @@ write_xlsx(vars.available.across.IAMs, file.path(IAM_SCENARIOS_LOCATION, "availa
 #   mutate(
 #     model = recode(model, !!!model.anonymization)
 #   )
+
+
 
 # Loading other data ----
 # ...
@@ -341,11 +484,24 @@ for (v in vars.all) {
     ) +
       facet_wrap(~target, ncol = 3) +
       mark_history() +
+      # 1) Base lines: all non-marker scenarios (normal colour + size)
       geom_line(
+        data = ~ dplyr::filter(.x, marker != "marker"),
         aes(
-          colour = model,
+          colour   = model,
           linetype = ssp
         )
+      ) +
+      # 2) Marker lines: plotted on top, black & thicker, no extra legend
+      geom_line(
+        data = ~ dplyr::filter(.x, marker == "marker"),
+        aes(
+          linetype = ssp
+          # colour is NOT mapped here
+        ),
+        colour      = "black",
+        linewidth   = 1.1,      # or `size = 1.1` in older ggplot2
+        show.legend = FALSE     # don’t create a new legend entry
       ) +
       scale_color_manual(values = plot.model.colors) +
       scale_linetype_manual(values = plot.ssp.linetypes) +
@@ -405,11 +561,30 @@ for (v in vars.all) {
     ) +
       facet_grid(region ~ target, scales = "free_y") +
       mark_history() +
+      # geom_line(
+      #   aes(
+      #     colour = model,
+      #     linetype = ssp
+      #   )
+      # ) +
+      # 1) Base lines: all non-marker scenarios (normal colour + size)
       geom_line(
+        data = ~ dplyr::filter(.x, marker != "marker"),
         aes(
-          colour = model,
+          colour   = model,
           linetype = ssp
         )
+      ) +
+      # 2) Marker lines: plotted on top, black & thicker, no extra legend
+      geom_line(
+        data = ~ dplyr::filter(.x, marker == "marker"),
+        aes(
+          linetype = ssp
+          # colour is NOT mapped here
+        ),
+        colour      = "black",
+        linewidth   = 1,      # or `size = 1.1` in older ggplot2
+        show.legend = FALSE     # don’t create a new legend entry
       ) +
       scale_color_manual(values = plot.model.colors) +
       scale_linetype_manual(values = plot.ssp.linetypes) +
@@ -516,6 +691,12 @@ to_per_capita_scenariomip <- function(df, y.u, p.u = pop.unit) {
         value = value * billion,
         unit = "USD_2010/cap/yr"
       )
+  } else if (y.u == "Mt CO2/yr") {
+    df <- df %>%
+      mutate(
+        value = value * million,
+        unit = "ton CO2/cap/yr"
+      )
   } else {
     print(paste0("The unit for variable ", v, " is not processed to per capita variables in this script."))
     df <- df %>%
@@ -577,11 +758,24 @@ for (v in vars.all) {
       ) +
         facet_wrap(~target, ncol = 3) +
         mark_history() +
+        # 1) Base lines: all non-marker scenarios (normal colour + size)
         geom_line(
+          data = ~ dplyr::filter(.x, marker != "marker"),
           aes(
-            colour = model,
+            colour   = model,
             linetype = ssp
           )
+        ) +
+        # 2) Marker lines: plotted on top, black & thicker, no extra legend
+        geom_line(
+          data = ~ dplyr::filter(.x, marker == "marker"),
+          aes(
+            linetype = ssp
+            # colour is NOT mapped here
+          ),
+          colour      = "black",
+          linewidth   = 1.1,      # or `size = 1.1` in older ggplot2
+          show.legend = FALSE     # don’t create a new legend entry
         ) +
         scale_color_manual(values = plot.model.colors) +
         scale_linetype_manual(values = plot.ssp.linetypes) +
@@ -612,7 +806,7 @@ for (v in vars.all) {
       print(paste0("Something went wrong in calculating per capita data for ", v))
     }
   } else {
-    print(paste0("No data repoted for ", v))
+    print(paste0("No data reported for ", v))
   }
 }
 
@@ -661,11 +855,30 @@ for (v in vars.all) {
       ) +
         facet_grid(region ~ target, scales = "free_y") +
         mark_history() +
+        # geom_line(
+        #   aes(
+        #     colour = model,
+        #     linetype = ssp
+        #   )
+        # ) +
+        # 1) Base lines: all non-marker scenarios (normal colour + size)
         geom_line(
+          data = ~ dplyr::filter(.x, marker != "marker"),
           aes(
-            colour = model,
+            colour   = model,
             linetype = ssp
           )
+        ) +
+        # 2) Marker lines: plotted on top, black & thicker, no extra legend
+        geom_line(
+          data = ~ dplyr::filter(.x, marker == "marker"),
+          aes(
+            linetype = ssp
+            # colour is NOT mapped here
+          ),
+          colour      = "black",
+          linewidth   = 0.9,      # or `size = 1.1` in older ggplot2
+          show.legend = FALSE     # don’t create a new legend entry
         ) +
         scale_color_manual(values = plot.model.colors) +
         scale_linetype_manual(values = plot.ssp.linetypes) +
@@ -844,11 +1057,30 @@ for (v in vars.all) {
       ) +
         facet_grid(region ~ target, scales = "free_y") +
         mark_history() +
+        # geom_line(
+        #   aes(
+        #     colour = model,
+        #     linetype = ssp
+        #   )
+        # ) +
+        # 1) Base lines: all non-marker scenarios (normal colour + size)
         geom_line(
+          data = ~ dplyr::filter(.x, marker != "marker"),
           aes(
-            colour = model,
+            colour   = model,
             linetype = ssp
           )
+        ) +
+        # 2) Marker lines: plotted on top, black & thicker, no extra legend
+        geom_line(
+          data = ~ dplyr::filter(.x, marker == "marker"),
+          aes(
+            linetype = ssp
+            # colour is NOT mapped here
+          ),
+          colour      = "black",
+          linewidth   = 0.9,      # or `size = 1.1` in older ggplot2
+          show.legend = FALSE     # don’t create a new legend entry
         ) +
         scale_color_manual(values = plot.model.colors) +
         scale_linetype_manual(values = plot.ssp.linetypes) +
@@ -1026,7 +1258,7 @@ for (v in vars.all) {
       ### 1) Standard deviation ----
 
       conv.data <- plot.data %>%
-        group_by(model, scenario, variable, unit, year, target, ssp, full.model.name) %>%
+        group_by(model, scenario, variable, unit, year, target, ssp, full.model.name, marker) %>%
         summarise(st.dev = sd(value)) %>%
         ungroup()
 
@@ -1047,13 +1279,29 @@ for (v in vars.all) {
           )
         ) +
         geom_line(aes(color = model)) +
+        # # 1) Base lines: all non-marker scenarios (normal colour + size)
+        # geom_line(
+        #   data = ~ dplyr::filter(.x, marker != "marker"),
+        #   aes(
+        #     colour   = model
+        #   )
+        # ) +
+        # # 2) Marker lines: plotted on top, black & thicker, no extra legend
+        # geom_line(
+        #   data = ~ dplyr::filter(.x, marker == "marker"),
+        #   aes(
+        #     colour = "black"
+        #   ),
+        #   colour      = "black",
+        #   linewidth   = 0.9,      # or `size = 1.1` in older ggplot2
+        #   show.legend = FALSE     # don’t create a new legend entry
+        # ) +
         scale_color_manual(values = plot.model.colors) +
         theme_jsk() +
         labs(
           y = paste0("Std Deviation (", y.unit, ")"),
           x = NULL,
-          title = paste("Convergence of", v),
-          subtitle = "per capita",
+          title = paste("Regional convergence of", v, "per capita"),
           caption = paste0("File: ", IAM_SCENARIOS_FILE)
         ) +
         guides(colour = guide_legend(title = NULL))
@@ -1081,7 +1329,7 @@ for (v in vars.all) {
       )
 
       conv.data.gini <- plot.data %>%
-        left_join(pop.data, by = c("model", "scenario", "region", "year", "target", "ssp", "full.model.name")) %>%
+        left_join(pop.data, by = c("model", "scenario", "region", "year", "target", "ssp", "full.model.name", "marker")) %>%
         rename(
           variable = variable.x,
           unit = unit.x,
@@ -1093,7 +1341,7 @@ for (v in vars.all) {
 
       gini.pop.weighted.data <- conv.data.gini %>%
         drop_na(population) %>%
-        group_by(model, scenario, variable, unit, year, target, ssp, full.model.name) %>%
+        group_by(model, scenario, variable, unit, year, target, ssp, full.model.name, marker) %>%
         reframe(gini.pop.weighted = weighted.gini(x = value, w = population)$bcwGini) %>%
         ungroup()
 
@@ -1122,13 +1370,29 @@ for (v in vars.all) {
           )
         ) +
         geom_line(aes(color = model)) +
+        # # 1) Base lines: all non-marker scenarios (normal colour + size)
+        # geom_line(
+        #   data = ~ dplyr::filter(.x, marker != "marker"),
+        #   aes(
+        #     colour   = model
+        #   )
+        # ) +
+        # # 2) Marker lines: plotted on top, black & thicker, no extra legend
+        # geom_line(
+        #   data = ~ dplyr::filter(.x, marker == "marker"),
+        #   aes(
+        #     colour = "black"
+        #   ),
+        #   color = "black",
+        #   linewidth   = 0.9      # or `size = 1.1` in older ggplot2
+        #   # show.legend = FALSE     # don’t create a new legend entry
+        # ) +
         scale_color_manual(values = plot.model.colors) +
         theme_jsk() +
         labs(
           y = paste0("Gini (pop weighted)"),
           x = NULL,
-          title = paste("Convergence of", v),
-          subtitle = "per capita",
+          title = paste("Regional convergence of", v, "per capita"),
           caption = paste0("File: ", IAM_SCENARIOS_FILE)
         ) +
         guides(colour = guide_legend(title = NULL))
@@ -1184,7 +1448,7 @@ for (v in vars.all) {
 
         ratio.nam.afr.data <- plot.data %>%
           filter(region %in% c("Africa (R10)", "North America (R10)")) %>%
-          group_by(model, scenario, variable, unit, year, target, ssp, full.model.name) %>%
+          group_by(model, scenario, variable, unit, year, target, ssp, full.model.name, marker) %>%
           pivot_wider(names_from = region, values_from = value) %>%
           mutate(ratio = `North America (R10)` / `Africa (R10)`) %>%
           ungroup()
@@ -1208,13 +1472,29 @@ for (v in vars.all) {
             )
           ) +
           geom_line(aes(color = model)) +
+          # # 1) Base lines: all non-marker scenarios (normal colour + size)
+          # geom_line(
+          #   data = ~ dplyr::filter(.x, marker != "marker"),
+          #   aes(
+          #     colour   = model
+          #   )
+          # ) +
+          # # 2) Marker lines: plotted on top, black & thicker, no extra legend
+          # geom_line(
+          #   data = ~ dplyr::filter(.x, marker == "marker"),
+          #   aes(
+          #     colour = "black"
+          #   ),
+          #   color = "black",
+          #   linewidth   = 0.9      # or `size = 1.1` in older ggplot2
+          #   # show.legend = FALSE     # don’t create a new legend entry
+          # ) +
           scale_color_manual(values = plot.model.colors) +
           theme_jsk() +
           labs(
             y = paste0("Ratio NAM/AFR"),
             x = NULL,
-            title = paste("Convergence of", v),
-            subtitle = "per capita",
+            title = paste("Regional convergence of", v, "per capita"),
             caption = paste0("File: ", IAM_SCENARIOS_FILE)
           ) +
           guides(colour = guide_legend(title = NULL))
@@ -1235,53 +1515,52 @@ for (v in vars.all) {
 
         # Pacific OECD to Africa
 
-        ratio.pao.afr.data <- plot.data %>%
-          filter(region %in% c("Africa (R10)", "Pacific OECD (R10)")) %>%
-          group_by(model, scenario, variable, unit, year, target, ssp, full.model.name) %>%
-          pivot_wider(names_from = region, values_from = value) %>%
-          mutate(ratio = `Pacific OECD (R10)` / `Africa (R10)`) %>%
-          ungroup()
-
-        # Reorder ScenarioMIP scenarios
-        ratio.pao.afr.data$target <- factor(ratio.pao.afr.data$target, levels = c("VLLO", "VLHO", "L", "ML", "M", "H"))
-
-        p.ratio.pao.afr <- ggplot(
-          ratio.pao.afr.data,
-          aes(
-            x = year, y = ratio,
-            group = interaction(full.model.name, scenario, variable, unit)
-          )
-        ) +
-          facet_wrap(~ssp, ncol = 5) +
-          mark_history() +
-          geom_point(
-            aes(
-              colour = model,
-              shape = target
-            )
-          ) +
-          geom_line(aes(color = model)) +
-          scale_color_manual(values = plot.model.colors) +
-          theme_jsk() +
-          labs(
-            y = paste0("Ratio PAO/AFR"),
-            x = NULL,
-            title = paste("Convergence of", v),
-            subtitle = "per capita",
-            caption = paste0("File: ", IAM_SCENARIOS_FILE)
-          ) +
-          guides(colour = guide_legend(title = NULL))
-
-        p.ratio.pao.afr
-
-
-        save_ggplot(
-          p = p.ratio.pao.afr,
-          h = 130,
-          w = 350,
-          format = "png",
-          f = file.path(path.figures.convergence.indicators, paste0("ratio_pao_afr_percapita_", clean_string(v)))
-        )
+        # ratio.pao.afr.data <- plot.data %>%
+        #   filter(region %in% c("Africa (R10)", "Pacific OECD (R10)")) %>%
+        #   group_by(model, scenario, variable, unit, year, target, ssp, full.model.name) %>%
+        #   pivot_wider(names_from = region, values_from = value) %>%
+        #   mutate(ratio = `Pacific OECD (R10)` / `Africa (R10)`) %>%
+        #   ungroup()
+        #
+        # # Reorder ScenarioMIP scenarios
+        # ratio.pao.afr.data$target <- factor(ratio.pao.afr.data$target, levels = c("VLLO", "VLHO", "L", "ML", "M", "H"))
+        #
+        # p.ratio.pao.afr <- ggplot(
+        #   ratio.pao.afr.data,
+        #   aes(
+        #     x = year, y = ratio,
+        #     group = interaction(full.model.name, scenario, variable, unit)
+        #   )
+        # ) +
+        #   facet_wrap(~ssp, ncol = 5) +
+        #   mark_history() +
+        #   geom_point(
+        #     aes(
+        #       colour = model,
+        #       shape = target
+        #     )
+        #   ) +
+        #   geom_line(aes(color = model)) +
+        #   scale_color_manual(values = plot.model.colors) +
+        #   theme_jsk() +
+        #   labs(
+        #     y = paste0("Ratio PAO/AFR"),
+        #     x = NULL,
+        #     title = paste("Regional convergence of", v, "per capita"),
+        #     caption = paste0("File: ", IAM_SCENARIOS_FILE)
+        #   ) +
+        #   guides(colour = guide_legend(title = NULL))
+        #
+        # p.ratio.pao.afr
+        #
+        #
+        # save_ggplot(
+        #   p = p.ratio.pao.afr,
+        #   h = 130,
+        #   w = 350,
+        #   format = "png",
+        #   f = file.path(path.figures.convergence.indicators, paste0("ratio_pao_afr_percapita_", clean_string(v)))
+        # )
 
         write_csv(plot.data, file.path(path.figures.data.convergence.indicators, paste0("ratio_pao_afr_percapita_", clean_string(v), ".csv")))
 
@@ -1295,18 +1574,18 @@ for (v in vars.all) {
       # Create individual indicator datasets with a common value column
       conv.data.ind <- conv.data %>%
         mutate(indicator = paste0("Std Dev (", y.unit, ")"), value = st.dev) %>%
-        select(model, scenario, variable, unit, year, target, ssp, full.model.name, indicator, value)
+        select(model, scenario, marker, variable, unit, year, target, ssp, full.model.name, indicator, value)
 
       gini.data.ind <- gini.pop.weighted.data %>%
         mutate(indicator = "Gini (pop weighted)", value = gini.pop.weighted) %>%
-        select(model, scenario, variable, unit, year, target, ssp, full.model.name, indicator, value)
+        select(model, scenario, marker, variable, unit, year, target, ssp, full.model.name, indicator, value)
 
       # Only create the ratio dataset if there is NAM data present.
       if (nrow(plot.data %>% filter(region == "North America (R10)")) > 0) {
         ratio.data.ind <- ratio.nam.afr.data %>%
           mutate(indicator = "Ratio NAM/AFR",
                  value = ratio) %>%
-          select(model, scenario, variable, unit, year, target, ssp, full.model.name, indicator, value)
+          select(model, scenario, marker, variable, unit, year, target, ssp, full.model.name, indicator, value)
 
         combined.data <- bind_rows(conv.data.ind, gini.data.ind, ratio.data.ind)
       } else {
@@ -1322,14 +1601,29 @@ for (v in vars.all) {
                                group = interaction(model, scenario, full.model.name, indicator))) +
         facet_grid(indicator ~ ssp, scales = "free_y", switch = "y") +
         geom_line(aes(color = model)) +
+        # geom_line(
+        #   data = ~ dplyr::filter(.x, marker != "marker"),
+        #   aes(
+        #     colour   = model
+        #   )
+        # ) +
+        # # 2) Marker lines: plotted on top, black & thicker, no extra legend
+        # geom_line(
+        #   data = ~ dplyr::filter(.x, marker == "marker"),
+        #   aes(
+        #     colour = "black"
+        #   ),
+        #   color = "black",
+        #   linewidth   = 0.9      # or `size = 1.1` in older ggplot2
+        #   # show.legend = FALSE     # don’t create a new legend entry
+        # ) +
         geom_point(aes(color = model, shape = target)) +
         scale_color_manual(values = plot.model.colors) +
         scale_y_continuous(position = "left") +  # ensures axis tick labels are on the left
         labs(
           x = "Year",
           y = NULL,
-          title = paste("Convergence of", v),
-          subtitle = "per capita",
+          title = paste("Regional convergence of", v, "per capita"),
           caption = paste0("File: ", IAM_SCENARIOS_FILE)
         ) +
         theme_jsk() +
@@ -1653,7 +1947,7 @@ for (v in vars.all) {
     if (nrow(plot.data) > 0) {
       print(paste0("Plotting ", v, " per capita (over GDP/cap)"))
 
-      p <- ggplot(
+      p.vs.gdp <- ggplot(
         plot.data,
         aes(
           x = `GDP|PPP`, y = .data[[v]],
@@ -1684,9 +1978,10 @@ for (v in vars.all) {
           colour = guide_legend(title = NULL),
           linetype = guide_legend(title = NULL)
         )
+      p.vs.gdp
 
       save_ggplot(
-        p = p,
+        p = p.vs.gdp,
         h = 200,
         w = 300,
         format = "png",
@@ -1760,7 +2055,7 @@ for (v in vars.all) {
     if (nrow(plot.data) > 0) {
       print(paste0("Plotting ", v, " per capita (over GDP/cap)"))
 
-      p <- ggplot(
+      p.vs.gdp.r5 <- ggplot(
         plot.data,
         aes(
           x = `GDP|PPP`, y = .data[[v]],
@@ -1791,9 +2086,10 @@ for (v in vars.all) {
           colour = guide_legend(title = NULL),
           linetype = guide_legend(title = NULL)
         )
+      p.vs.gdp.r5
 
       save_ggplot(
-        p = p,
+        p = p.vs.gdp.r5,
         h = 200,
         w = 300,
         format = "png",
@@ -1810,7 +2106,7 @@ for (v in vars.all) {
       plot.data <- plot.data %>% drop_na(.data[[v]])
 
 
-      p.convergence <- ggplot(
+      p.convergence.vs.gdp <- ggplot(
         plot.data,
         aes(
           x = `GDP|PPP`, y = .data[[v]],
@@ -1842,10 +2138,11 @@ for (v in vars.all) {
           colour = guide_legend(title = NULL),
           linetype = guide_legend(title = NULL)
         )
+      p.convergence.vs.gdp
 
 
       save_ggplot(
-        p = p.convergence,
+        p = p.convergence.vs.gdp,
         h = 200,
         w = 300,
         format = "png",
@@ -1853,7 +2150,7 @@ for (v in vars.all) {
       )
 
       # Faceting by SSP
-      p.convergence.ssp <- ggplot(
+      p.convergence.ssp.vs.gdp <- ggplot(
         plot.data,
         aes(
           x = `GDP|PPP`, y = .data[[v]],
@@ -1885,10 +2182,10 @@ for (v in vars.all) {
           colour = guide_legend(title = NULL),
           linetype = guide_legend(title = NULL)
         )
-
+      p.convergence.ssp.vs.gdp
 
       save_ggplot(
-        p = p.convergence.ssp,
+        p = p.convergence.ssp.vs.gdp,
         h = 200,
         w = 300,
         format = "png",
@@ -1985,11 +2282,30 @@ for (v in vars.electrification) {
     ) +
       facet_wrap(~target, ncol = 3) +
       mark_history() +
+      # geom_line(
+      #   aes(
+      #     colour = model,
+      #     linetype = ssp
+      #   )
+      # ) +
+      # 1) Base lines: all non-marker scenarios (normal colour + size)
       geom_line(
+        data = ~ dplyr::filter(.x, marker != "marker"),
         aes(
-          colour = model,
+          colour   = model,
           linetype = ssp
         )
+      ) +
+      # 2) Marker lines: plotted on top, black & thicker, no extra legend
+      geom_line(
+        data = ~ dplyr::filter(.x, marker == "marker"),
+        aes(
+          linetype = ssp
+          # colour is NOT mapped here
+        ),
+        colour      = "black",
+        linewidth   = 1.1,      # or `size = 1.1` in older ggplot2
+        show.legend = FALSE     # don’t create a new legend entry
       ) +
       scale_color_manual(values = plot.model.colors) +
       scale_linetype_manual(values = plot.ssp.linetypes) +
@@ -2019,6 +2335,7 @@ for (v in vars.electrification) {
     print(paste0("No data repoted for ", v))
   }
 }
+
 ### R5 ----
 for (v in vars.electrification) {
   plot.data <- scenarios.electrification %>% filter(
@@ -2045,11 +2362,30 @@ for (v in vars.electrification) {
     ) +
       facet_grid(region ~ target, scales = "free_y") +
       mark_history() +
+      # geom_line(
+      #   aes(
+      #     colour = model,
+      #     linetype = ssp
+      #   )
+      # ) +
+      # 1) Base lines: all non-marker scenarios (normal colour + size)
       geom_line(
+        data = ~ dplyr::filter(.x, marker != "marker"),
         aes(
-          colour = model,
+          colour   = model,
           linetype = ssp
         )
+      ) +
+      # 2) Marker lines: plotted on top, black & thicker, no extra legend
+      geom_line(
+        data = ~ dplyr::filter(.x, marker == "marker"),
+        aes(
+          linetype = ssp
+          # colour is NOT mapped here
+        ),
+        colour      = "black",
+        linewidth   = 1.1,      # or `size = 1.1` in older ggplot2
+        show.legend = FALSE     # don’t create a new legend entry
       ) +
       scale_color_manual(values = plot.model.colors) +
       scale_linetype_manual(values = plot.ssp.linetypes) +
@@ -2061,13 +2397,13 @@ for (v in vars.electrification) {
         y = y.unit,
         x = NULL,
         title = v,
-        subtitle = "vs GDP per capita",
         caption = paste0("File: ", IAM_SCENARIOS_FILE)
       ) +
       guides(
         colour = guide_legend(title = NULL),
         linetype = guide_legend(title = NULL)
       )
+    p
 
     save_ggplot(
       p = p,
@@ -2191,6 +2527,8 @@ for (v in c(
           linetype = guide_legend(title = NULL)
         )
 
+      p
+
       save_ggplot(
         p = p,
         h = 200,
@@ -2241,11 +2579,6 @@ for (v in c(
       )
     )
 
-  # order data by scenarioMIP target scenario and by region
-  plot.data$target <- factor(plot.data$target, levels = c("VLLO", "VLHO", "L", "ML", "M", "H"))
-  plot.data$region <- factor(plot.data$region, levels = c("Middle East & Africa (R5)", "Latin America (R5)", "Asia (R5)", "Reforming Economies (R5)", "OECD & EU (R5)", "World"))
-
-
   # change to per capita units
   if (nrow(plot.data %>% filter(variable != "Population")) > 0) {
     y.unit <- plot.data %>%
@@ -2270,7 +2603,9 @@ for (v in c(
       select(-unit) %>%
       pivot_wider(names_from = variable, values_from = value)
 
-
+    # order data by scenarioMIP target scenario and by region
+    plot.data$target <- factor(plot.data$target, levels = c("VLLO", "VLHO", "L", "ML", "M", "H"))
+    plot.data$region <- factor(plot.data$region, levels = c("Middle East & Africa (R5)", "Latin America (R5)", "Asia (R5)", "Reforming Economies (R5)", "OECD & EU (R5)", "World"))
 
     # plot
     if (nrow(plot.data) > 0) {
@@ -2307,6 +2642,7 @@ for (v in c(
           colour = guide_legend(title = NULL),
           linetype = guide_legend(title = NULL)
         )
+      p
 
       save_ggplot(
         p = p,
@@ -2345,7 +2681,7 @@ if (!dir.exists(path.figures.data.fe.per.service)) {
   dir.create(path.figures.data.fe.per.service, recursive = TRUE)
 }
 
-
+#     plot.data <- to_per_unit_service_scenariomip(df = plot.data, var.service = v.service)
 to_per_unit_service_scenariomip <- function(df, var.service) {
   # formatting
   df <- df %>%
@@ -2422,6 +2758,18 @@ to_per_unit_service_scenariomip <- function(df, var.service) {
         value = value * exa / giga,
         unit = "GJ/t"
       )
+  } else if (unit.per.service == "Mt CO2/yr/pkm/yr") {
+    df <- df %>%
+      mutate(
+        value = value * mega * 10^6,
+        unit = "g CO2/pkm"
+      )
+  } else if (unit.per.service == "Mt CO2/yr/m2") {
+    df <- df %>%
+      mutate(
+        value = value * mega * 10^3,
+        unit = "kg CO2/yr/m2"
+      )
   } else {
     print(paste0("The unit for variable ", v, " is not processed to per capita variables in this script."))
     df <- df %>%
@@ -2494,14 +2842,19 @@ scenarios.with.aggregations <- bind_rows(scenarios, iron_and_steel)
 
 ## choose variable to be calculated per unit of service: ----
 
-v <- "Final Energy|Transportation"
-v.service <- "Energy Service|Transportation|Freight"
+v <- "Final Energy|Residential and Commercial"
+v.service <- "Energy Service|Residential and Commercial|Floor Space"
 
 #' Final Energy variables to be calculated per unit of service:
 #' "Final Energy|Residential and Commercial",
 #' "Final Energy|Residential and Commercial|Electricity",
 #' "Final Energy|Transportation",
 #' "Final Energy|Industry"
+#'
+#' Emission variables to be calculated per unit of service:
+#' "Emissions|CO2|Energy|Demand|Transportation"
+#' "Emissions|CO2|Energy|Demand|Residential and Commercial"
+#' "Emissions|CO2|Energy|Demand|Residential"
 #'
 #' Energy service variables:
 #' Main ones:
@@ -2521,6 +2874,7 @@ v.service <- "Energy Service|Transportation|Freight"
 name.service <- v.service %>%
   gsub("Energy Service\\|", "", .) %>%
   gsub("Residential and Commercial\\|", "", .) %>%
+  gsub("Residential\\|", "", .) %>%
   gsub("Transportation\\|", "", .) %>%
   gsub("Non-Metallic Minerals\\|", "", .)
 
@@ -2561,6 +2915,7 @@ if (nrow(plot.data %>% filter(variable != v.service)) > 0) { # only if you have 
     y.unit <- plot.data %>%
       pull(unit) %>%
       unique()
+
     p <- ggplot(
       plot.data,
       aes(
@@ -2568,13 +2923,32 @@ if (nrow(plot.data %>% filter(variable != v.service)) > 0) { # only if you have 
         group = interaction(full.model.name, scenario, region, variable, unit)
       )
     ) +
-      facet_wrap(~ssp, ncol = 3) +
+      facet_wrap(~target, ncol = 3) +
       mark_history() +
+      # geom_line(
+      #   aes(
+      #     colour = model,
+      #     linetype = ssp
+      #   )
+      # ) +
+      # 1) Base lines: all non-marker scenarios (normal colour + size)
       geom_line(
+        data = ~ dplyr::filter(.x, marker != "marker"),
         aes(
-          colour = model,
+          colour   = model,
           linetype = ssp
         )
+      ) +
+      # 2) Marker lines: plotted on top, black & thicker, no extra legend
+      geom_line(
+        data = ~ dplyr::filter(.x, marker == "marker"),
+        aes(
+          linetype = ssp
+          # colour is NOT mapped here
+        ),
+        colour      = "black",
+        linewidth   = 1.1,      # or `size = 1.1` in older ggplot2
+        show.legend = FALSE     # don’t create a new legend entry
       ) +
       scale_color_manual(values = plot.model.colors) +
       scale_linetype_manual(values = plot.ssp.linetypes) +
@@ -2589,6 +2963,7 @@ if (nrow(plot.data %>% filter(variable != v.service)) > 0) { # only if you have 
       guides(
         colour = guide_legend(title = NULL),
         linetype = guide_legend(title = NULL)
+        # linetype = "none" # if faceting by ssp, remove the linetype legend
       )
     p
 
@@ -2620,6 +2995,7 @@ if (nrow(plot.data %>% filter(variable != v.service)) > 0) { # only if you have 
 name.service <- v.service %>%
   gsub("Energy Service\\|", "", .) %>%
   gsub("Residential and Commercial\\|", "", .) %>%
+  gsub("Residential\\|", "", .) %>%
   gsub("Transportation\\|", "", .) %>%
   gsub("Non-Metallic Minerals\\|", "", .)
 
@@ -2662,6 +3038,7 @@ if (nrow(plot.data %>% filter(variable != v.service)) > 0) { # only if you have 
     y.unit <- plot.data %>%
       pull(unit) %>%
       unique()
+
     p <- ggplot(
       plot.data,
       aes(
@@ -2671,11 +3048,30 @@ if (nrow(plot.data %>% filter(variable != v.service)) > 0) { # only if you have 
     ) +
       facet_grid(region ~ target, scales = "free_y") +
       mark_history() +
+      # geom_line(
+      #   aes(
+      #     colour = model,
+      #     linetype = ssp
+      #   )
+      # ) +
+      # 1) Base lines: all non-marker scenarios (normal colour + size)
       geom_line(
+        data = ~ dplyr::filter(.x, marker != "marker"),
         aes(
-          colour = model,
+          colour   = model,
           linetype = ssp
         )
+      ) +
+      # 2) Marker lines: plotted on top, black & thicker, no extra legend
+      geom_line(
+        data = ~ dplyr::filter(.x, marker == "marker"),
+        aes(
+          linetype = ssp
+          # colour is NOT mapped here
+        ),
+        colour      = "black",
+        linewidth   = 1.1,      # or `size = 1.1` in older ggplot2
+        show.legend = FALSE     # don’t create a new legend entry
       ) +
       scale_color_manual(values = plot.model.colors) +
       scale_linetype_manual(values = plot.ssp.linetypes) +
@@ -2694,6 +3090,7 @@ if (nrow(plot.data %>% filter(variable != v.service)) > 0) { # only if you have 
         colour = guide_legend(title = NULL),
         linetype = guide_legend(title = NULL)
       )
+    p
 
     save_ggplot(
       p = p,
@@ -2743,6 +3140,7 @@ if (nrow(plot.data %>% filter(variable != v.service)) > 0) { # only if you have 
         colour = guide_legend(title = NULL),
         linetype = guide_legend(title = NULL)
       )
+    p.convergence
 
 
     save_ggplot(
@@ -2786,6 +3184,7 @@ if (nrow(plot.data %>% filter(variable != v.service)) > 0) { # only if you have 
         colour = guide_legend(title = NULL),
         linetype = guide_legend(title = NULL)
       )
+    p.convergence.ssp
 
 
     save_ggplot(
@@ -2812,6 +3211,7 @@ if (nrow(plot.data %>% filter(variable != v.service)) > 0) { # only if you have 
 name.service <- v.service %>%
   gsub("Energy Service\\|", "", .) %>%
   gsub("Residential and Commercial\\|", "", .) %>%
+  gsub("Residential\\|", "", .) %>%
   gsub("Transportation\\|", "", .) %>%
   gsub("Non-Metallic Minerals\\|", "", .)
 
@@ -2866,11 +3266,30 @@ if (nrow(plot.data %>% filter(variable != v.service)) > 0) { # only if you have 
     ) +
       facet_grid(region ~ target, scales = "free_y") +
       mark_history() +
+      # geom_line(
+      #   aes(
+      #     colour = model,
+      #     linetype = ssp
+      #   )
+      # ) +
+      # 1) Base lines: all non-marker scenarios (normal colour + size)
       geom_line(
+        data = ~ dplyr::filter(.x, marker != "marker"),
         aes(
-          colour = model,
+          colour   = model,
           linetype = ssp
         )
+      ) +
+      # 2) Marker lines: plotted on top, black & thicker, no extra legend
+      geom_line(
+        data = ~ dplyr::filter(.x, marker == "marker"),
+        aes(
+          linetype = ssp
+          # colour is NOT mapped here
+        ),
+        colour      = "black",
+        linewidth   = 1.1,      # or `size = 1.1` in older ggplot2
+        show.legend = FALSE     # don’t create a new legend entry
       ) +
       scale_color_manual(values = plot.model.colors) +
       scale_linetype_manual(values = plot.ssp.linetypes) +
@@ -3012,6 +3431,7 @@ if (nrow(plot.data %>% filter(variable != v.service)) > 0) { # only if you have 
 name.service <- v.service %>%
   gsub("Energy Service\\|", "", .) %>%
   gsub("Residential and Commercial\\|", "", .) %>%
+  gsub("Residential\\|", "", .) %>%
   gsub("Transportation\\|", "", .) %>%
   gsub("Non-Metallic Minerals\\|", "", .)
 
@@ -3401,6 +3821,7 @@ if (nrow(plot.data %>% filter(variable != v.service)) > 0) { # only if you have 
 name.service <- v.service %>%
   gsub("Energy Service\\|", "", .) %>%
   gsub("Residential and Commercial\\|", "", .) %>%
+  gsub("Residential\\|", "", .) %>%
   gsub("Transportation\\|", "", .) %>%
   gsub("Non-Metallic Minerals\\|", "", .)
 
@@ -3618,6 +4039,7 @@ gdp.percap.unit <- plot.data.gdp.percap %>%
 name.service <- v.service %>%
   gsub("Energy Service\\|", "", .) %>%
   gsub("Residential and Commercial\\|", "", .) %>%
+  gsub("Residential\\|", "", .) %>%
   gsub("Transportation\\|", "", .) %>%
   gsub("Non-Metallic Minerals\\|", "", .)
 
@@ -3732,6 +4154,7 @@ gdp.percap.unit <- plot.data.gdp.percap %>%
 name.service <- v.service %>%
   gsub("Energy Service\\|", "", .) %>%
   gsub("Residential and Commercial\\|", "", .) %>%
+  gsub("Residential\\|", "", .) %>%
   gsub("Transportation\\|", "", .) %>%
   gsub("Non-Metallic Minerals\\|", "", .)
 
@@ -3928,7 +4351,7 @@ vars.fe.intensity <- c(
 #' "Production|Iron and Steel" (= "Production|Iron and Steel|Iron" + "Production|Iron and Steel|Steel")
 #' "Production|Non-Metallic Minerals|Cement"
 
-v <- "Final Energy|Residential and Commercial"
+# v <- "Final Energy|Residential and Commercial"
 # v.service = "Production|Non-Metallic Minerals|Cement"
 
 ## a) vs time ----
