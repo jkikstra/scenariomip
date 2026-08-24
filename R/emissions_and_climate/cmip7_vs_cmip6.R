@@ -23,6 +23,19 @@ source(here("R","utils.R"))
 the.ten <- c("CO2", "N2O", "BC", "OC", "CH4", "NH3", "Sulfur", "VOC", "NOx", "CO")
 
 # Load data ----
+## NGFS scenarios ----
+ngfs.scenarios <- read_csv(
+  '/Users/jarmo/Library/CloudStorage/OneDrive-IIASA/_Other/Data/Emissions data/NGFS/iamc_data-38dc081f-532b-4374-a35f-8bcacdb786d8.csv'
+) %>% select(-version, -type) %>% iamc_wide_to_long()
+
+ngfs.scenarios.co2.harmonized <- ngfs.scenarios %>% filter(
+  variable %in% c(
+    "AR6 climate diagnostics|Infilled|Emissions|CO2|AFOLU", "AR6 climate diagnostics|Infilled|Emissions|CO2|Energy and Industrial Processes"
+  )
+) %>% reframe(value=sum(value), .by = c(model,scenario,unit,region,year))
+ngfs.scenarios.co2.unharmonized <- ngfs.scenarios %>% filter(variable=="Emissions|CO2") 
+
+
 ## cmip6 scenarios ----
 cmip6.scenarios <- read_csv(
   '/Users/jarmo/Library/CloudStorage/OneDrive-SharedLibraries-IIASA/ECE.prog - Documents/Projects/CMIP7/IAM Data Processing/IAM Files from CMIP6/SSP_CMIP6_201811.csv'
@@ -1731,5 +1744,343 @@ scaler = 2
 save_ggplot(
   p = egu26.main,
   f = here("figures", "egu26_main"),
-  h = (365.8)/scaler, w = (721.1 + 90)/scaler
+  h = (365.8)/scaler*1.1, w = (721.1 + 90)/scaler,
+  dpi = 1000
 )
+
+
+
+
+# NGFS comparison ----
+ar6.history <- read_csv(
+  '/Users/jarmo/Library/CloudStorage/OneDrive-IIASA/_Other/Data/Emissions data/cmip6/history_ar6.csv'
+  # "C:/Users/kikstra/Downloads/history_ar6.csv"
+) %>%
+  iamc_wide_to_long(upper.to.lower = T) %>%
+  iamc_variable_keep_two_levels(levels = c(3,4)) %>%
+  filter(variable%nin%c("CO2|Energy and Industrial Processes","CO2|AFOLU")) %>%
+  iamc_variable_keep_one_level(level=1) %>%
+  filter(variable%in%the.ten) %>%
+  mutate_cond(variable=="VOC", variable="NMVOC") %>%
+  mutate_cond(variable=="Sulfur", variable="SO2") %>%
+  mutate_cond(variable=="CO2", value=value/1e3) %>%
+  mutate_cond(variable=="CO2", unit="Gt CO2/yr")
+
+## Main figure (CO2) ----
+
+
+ngfs_longnames <- c(
+  # Orderly
+  "o_1p5c"         = "",   # 
+  "o_2c"           = "",   # 
+
+  # Disorderly
+  "d_delfrag"      = "",   # 
+  "d_delfrag_2035" = "",   # 
+  "d_strain"       = "",   # 
+  "d_strain_2025"  = "",   # 
+
+  # Hot house
+  "h_ndc"          = "",   # 
+  "h_ndc_2035"     = "",   # 
+  "h_cpol"         = ""    #
+)
+
+
+ngfs_colors <- c(
+  # Orderly — greens
+  "o_1p5c"         = "#1B7837",   # dark forest green
+  "o_2c"           = "#74C476",   # lighter green
+
+  # Disorderly — oranges
+  "d_delfrag"      = "#D95F02",   # burnt orange  (divergent, more severe)
+  "d_delfrag_2035" = "#F4A462",   # muted burnt orange
+  "d_strain"       = "#E6AB02",   # amber         (delayed)
+  "d_strain_2025"  = "#F5D37A",   # muted amber
+
+  # Hot house — reds
+  "h_ndc"          = "#C0392B",   # red
+  "h_ndc_2035"     = "#E88585",   # muted red
+  "h_cpol"         = "#67001F"    # dark crimson   (worst case, most distinct)
+)
+
+
+
+
+
+p.cmip.plus.ngfs <- ggplot(
+    cmip6.scenarios.global |> filter(variable%in%"CO2") |>
+      # filter(scenario%in%c("SSP1-26","SSP3-70")) %>%
+      add_facet_label(),
+    aes(x = year, y = value)
+  ) +
+    # facet_wrap(~facet_label, scales = "free_y", nrow = 1) +
+
+    # cmip6 background
+    geom_line(
+      aes(colour=scenario, group = interaction(model, scenario)),
+      # colour="darkgrey",
+      linetype="dotted",
+      linewidth=0.7,
+      alpha=0.4
+    ) +
+    geom_line(
+      data = ar6.history %>% filter(variable%in%"CO2", year>=1990) |>
+        add_facet_label(),
+      aes(group = interaction(scenario)),
+      colour="darkgrey",
+      linewidth=0.7,
+      alpha=0.5
+    ) +
+
+    # cmip7 scenarios
+    geom_line(
+      data=cmip7.scenarios.global|>
+        filter(variable%in%"CO2") |>
+        add_facet_label(),
+      aes(colour=scenario, group = interaction(model, scenario)),
+      linewidth = 1.2,
+      linetype="dashed",
+      alpha=0.4
+    ) +
+    # cmip7 history
+    geom_line(
+      data = cmip7.history %>% filter(variable%in%"CO2", year>=1990) |>
+        add_facet_label(),
+      aes(group = interaction(scenario)),
+      linewidth=1.3,
+      colour="black",
+      alpha=0.7
+    ) +
+  
+    # NGFS scenarios (unharmonized)
+    geom_line(
+      data=ngfs.scenarios.co2.unharmonized|> 
+        mutate(facet_label="CO2\n(Gt CO2/yr)"),
+      aes(colour=scenario, group = interaction(model, scenario),
+    y=value/1e3),
+      linewidth = 1.2
+    ) +
+  
+
+
+    scale_color_manual(breaks=c(SCENARIOS.6,SCENARIOS.7, scenario_unique(ngfs.scenarios.co2.unharmonized)),values=c(SCENARIOS.6.COLOURS,SCENARIOS.7.COLOURS,ngfs_colors)) +
+    scale_x_continuous(limits = c(2010,2100),expand = c(0,0)) +
+    theme_jsk() +
+    legend_column_wise(ncol=3) +
+    mark_history(sy = 2025) +
+    theme(legend.title = element_blank()) +
+    labs(y = "Gt CO2/yr")
+
+p.cmip.plus.ngfs.harmonized <- ggplot(
+    cmip6.scenarios.global |> filter(variable%in%"CO2") |>
+      # filter(scenario%in%c("SSP1-26","SSP3-70")) %>%
+      add_facet_label(),
+    aes(x = year, y = value)
+  ) +
+    # facet_wrap(~facet_label, scales = "free_y", nrow = 1) +
+
+    # cmip6 background
+    geom_line(
+      aes(colour=scenario, group = interaction(model, scenario)),
+      # colour="darkgrey",
+      linetype="dotted",
+      linewidth=0.7,
+      alpha=0.4
+    ) +
+    geom_line(
+      data = ar6.history %>% filter(variable%in%"CO2", year>=1990) |>
+        add_facet_label(),
+      aes(group = interaction(scenario)),
+      colour="darkgrey",
+      linewidth=0.7,
+      alpha=0.5
+    ) +
+
+    # cmip7 scenarios
+    geom_line(
+      data=cmip7.scenarios.global|>
+        filter(variable%in%"CO2") |>
+        add_facet_label(),
+      aes(colour=scenario, group = interaction(model, scenario)),
+      linewidth = 1.2,
+      linetype="dashed",
+      alpha=0.4
+    ) +
+    # cmip7 history
+    geom_line(
+      data = cmip7.history %>% filter(variable%in%"CO2", year>=1990) |>
+        add_facet_label(),
+      aes(group = interaction(scenario)),
+      linewidth=1.3,
+      colour="black",
+      alpha=0.7
+    ) +
+  
+    # NGFS scenarios (harmonized)
+    geom_line(
+      data=ngfs.scenarios.co2.harmonized|> 
+        mutate(facet_label="CO2\n(Gt CO2/yr)"),
+      aes(colour=scenario, group = interaction(model, scenario),
+    y=value/1e3),
+      linewidth = 1.2
+    ) +
+  
+
+
+    scale_color_manual(breaks=c(SCENARIOS.6,SCENARIOS.7, scenario_unique(ngfs.scenarios.co2.unharmonized)),values=c(SCENARIOS.6.COLOURS,SCENARIOS.7.COLOURS,ngfs_colors)) +
+    scale_x_continuous(limits = c(2010,2100),expand = c(0,0)) +
+    theme_jsk() +
+    legend_column_wise(ncol=3) +
+    mark_history(sy = 2025) +
+    theme(legend.title = element_blank()) +
+    labs(y = "Gt CO2/yr")
+
+
+
+p.cmip <- ggplot(
+    cmip6.scenarios.global |> filter(variable%in%"CO2") |>
+      # filter(scenario%in%c("SSP1-26","SSP3-70")) %>%
+      add_facet_label(),
+    aes(x = year, y = value)
+  ) +
+    # facet_wrap(~facet_label, scales = "free_y", nrow = 1) +
+
+    # cmip6 background
+    geom_line(
+      aes(colour=scenario, group = interaction(model, scenario)),
+      # colour="darkgrey",
+      linetype="dotted",
+      linewidth=0.7,
+      alpha=0.4
+    ) +
+    geom_line(
+      data = ar6.history %>% filter(variable%in%"CO2", year>=1990) |>
+        add_facet_label(),
+      aes(group = interaction(scenario)),
+      colour="darkgrey",
+      linewidth=0.7,
+      alpha=0.5
+    ) +
+
+    # cmip7 scenarios
+    geom_line(
+      data=cmip7.scenarios.global|>
+        filter(variable%in%"CO2") |>
+        add_facet_label(),
+      aes(colour=scenario, group = interaction(model, scenario)),
+      linewidth = 1.2,
+      linetype="dashed",
+      alpha=0.9
+    ) +
+    # cmip7 history
+    geom_line(
+      data = cmip7.history %>% filter(variable%in%"CO2", year>=1990) |>
+        add_facet_label(),
+      aes(group = interaction(scenario)),
+      linewidth=1.3,
+      colour="black",
+      alpha=0.7
+    ) +
+
+
+    scale_color_manual(breaks=c(SCENARIOS.6,SCENARIOS.7, scenario_unique(ngfs.scenarios.co2.unharmonized)),values=c(SCENARIOS.6.COLOURS,SCENARIOS.7.COLOURS,ngfs_colors)) +
+    scale_x_continuous(limits = c(2010,2100),expand = c(0,0)) +
+    theme_jsk() +
+    legend_column_wise(ncol=3) +
+    mark_history(sy = 2025) +
+    theme(legend.title = element_blank()) +
+    labs(y = "Gt CO2/yr") 
+
+p.cmip
+
+ngfs.banque.france <- p.cmip | p.cmip.plus.ngfs
+
+
+
+save_ggplot(
+  p = ngfs.banque.france,
+  f = here("figures", "ngfs_vs_cmip"),
+  h = 300/2, w = 500/2,
+  dpi = 500
+)
+
+ngfs.banque.france.harmonized <- p.cmip | p.cmip.plus.ngfs.harmonized
+
+save_ggplot(
+  p = ngfs.banque.france.harmonized,
+  f = here("figures", "ngfs-harmonized_vs_cmip"),
+  h = 300/2, w = 500/2,
+  dpi = 500
+)
+
+
+
+
+
+
+p.cmip.plus.ngfs <- ggplot(
+    cmip6.scenarios.global |> filter(variable%in%"CO2") |>
+      # filter(scenario%in%c("SSP1-26","SSP3-70")) %>%
+      add_facet_label(),
+    aes(x = year, y = value)
+  ) +
+    # facet_wrap(~facet_label, scales = "free_y", nrow = 1) +
+
+    
+    # NGFS scenarios (unharmonized) — ribbon showing model spread per scenario
+    geom_ribbon(
+      data = ngfs.scenarios.co2.unharmonized |>
+        mutate(facet_label="CO2\n(Gt CO2/yr)") |>
+        group_by(scenario, year) |>
+        summarise(ymin = min(value/1e3), ymax = max(value/1e3), .groups = "drop"),
+      aes(x = year, ymin = ymin, ymax = ymax, fill = scenario, group = scenario),
+      alpha = 0.2
+    ) +
+
+    # NGFS scenarios (unharmonized)
+    geom_line(
+      data=ngfs.scenarios.co2.unharmonized|>
+        mutate(facet_label="CO2\n(Gt CO2/yr)"),
+      aes(colour=scenario, group = interaction(model, scenario),
+    y=value/1e3),
+      linewidth = 0.7
+    ) +
+  
+    # cmip7 scenarios
+    geom_line(
+      data=cmip7.scenarios.global|>
+        filter(variable%in%"CO2") |>
+        add_facet_label(),
+      aes(colour=scenario, group = interaction(model, scenario)),
+      linewidth = 1.2,
+      linetype="dashed",
+      alpha=0.4
+    ) +
+    # cmip7 history
+    geom_line(
+      data = cmip7.history %>% filter(variable%in%"CO2", year>=1990) |>
+        add_facet_label(),
+      aes(group = interaction(scenario)),
+      linewidth=1.3,
+      colour="black",
+      alpha=0.7
+    ) +
+
+  
+
+
+    scale_color_manual(breaks=c(SCENARIOS.6,SCENARIOS.7, scenario_unique(ngfs.scenarios.co2.unharmonized)),values=c(SCENARIOS.6.COLOURS,SCENARIOS.7.COLOURS,ngfs_colors)) +
+    scale_x_continuous(limits = c(2010,2100),expand = c(0,0)) +
+    theme_jsk() +
+    mark_history(sy = 2025) +
+    # theme(legend.title = element_blank(),
+    #       legend.position = "none") +
+    labs(y = "Gt CO2/yr")
+
+
+
+
+
+
+
