@@ -13,7 +13,7 @@ df1 = pyam.read_iiasa(
     scenario='SSP1 - Very Low Emissions',
 )
 df1.to_csv(
-      os.path.join('data','marker_set','vllo.csv')
+      os.path.join('data','marker_set','vl.csv')
   )
 df2 = pyam.read_iiasa(
     'ssp_submission',
@@ -21,12 +21,12 @@ df2 = pyam.read_iiasa(
     scenario='SSP2 - Low Overshoot_a',
 )
 df2.to_csv(
-      os.path.join('data','marker_set','vlho.csv')
+      os.path.join('data','marker_set','ln.csv')
   )
 df3 = pyam.read_iiasa(
     'ssp_submission',
     model='MESSAGE*',
-    scenario='SSP2 - Low Emissions_e',
+    scenario='SSP2 - Low Emissions',
 )
 df3.to_csv(
       os.path.join('data','marker_set','l.csv')
@@ -49,9 +49,8 @@ df5.to_csv(
   )
 df6 = pyam.read_iiasa(
     'ssp_submission',
-    model='GCAM*',
-    # scenario='SSP3 - High Emissions',
-    scenario='SSP3 - High Emissions_a', # email from Mel George on Wednesday, July 9, 2025 21:49
+    model='GCAM 8s',
+    scenario='SSP3 - High Emissions'
 )
 df6.to_csv(
       os.path.join('data','marker_set','h.csv')
