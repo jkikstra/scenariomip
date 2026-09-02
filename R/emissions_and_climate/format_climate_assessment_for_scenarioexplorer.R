@@ -1,5 +1,9 @@
 #' Code for ScenarioMIP data publication of climate assessment data
 #' Developed by Jarmo Kikstra
+#' Used for version:
+#' - v0.3 (september 2026)
+#' - v0.2 (april 2026)
+#' - v0.1 (february 2026) 
 
 
 # Load packages ----
@@ -37,6 +41,11 @@ VERSION_RELEASE_SCENARIOMIP <- "v0.1" # version of the data release for Scenario
 MAIN_DATE <- "20260325" # date of climate assessment run (v0.2)
 VERSION_RELEASE_SCENARIOMIP <- "v0.2" # version of the data release for ScenarioMIP
 VERSION_RELEASE_SCENARIOMIP_PREVIOUS <- "v0.1"
+
+MAIN_DATE <- "20260901_marker" # date of climate assessment run (v0.2)
+VERSION_RELEASE_SCENARIOMIP <- "v0.3" # version of the data release for ScenarioMIP
+VERSION_RELEASE_SCENARIOMIP_PREVIOUS <- "v0.2"
+
 
 MAIN_DATA_FOLDER_NAME <- paste0(MAIN_DATE, " (release ", VERSION_RELEASE_SCENARIOMIP, ")")
 MAIN_DATA_FOLDER_CLIMATE_ASSESSMENT <- here("data", "ca", MAIN_DATA_FOLDER_NAME) # prep for first pre-release (only infilled emissions and climate outcomes)
